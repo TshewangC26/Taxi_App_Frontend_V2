@@ -1,0 +1,1566 @@
+import 'dart:async';
+import 'dart:convert';
+import 'package:firebase_database/firebase_database.dart';
+import 'package:flutter/material.dart';
+import 'package:google_maps_flutter/google_maps_flutter.dart';
+import 'package:geolocator/geolocator.dart';
+import 'package:http/http.dart' as http;
+import 'package:provider/provider.dart';
+import '../providers/auth_provider.dart';
+import '../providers/booking_provider.dart';
+import '../services/firebase_services.dart';
+import '../models/booking.dart';
+import 'passenger_home_screen.dart';
+import 'book_ride_screen.dart';
+import 'profile_screen.dart';
+import 'login_screens.dart';
+
+class MyBookingsScreen extends StatefulWidget {
+  const MyBookingsScreen({super.key});
+
+  @override
+  State<MyBookingsScreen> createState() => _MyBookingsScreenState();
+}
+
+class _MyBookingsScreenState extends State<MyBookingsScreen>
+    with SingleTickerProviderStateMixin {
+  late TabController _tabController;
+
+  final Map<int, StreamSubscription> _bookingSubscriptions = {};
+  final Map<int, String> _firebaseStatuses = {};
+
+  GoogleMapController? _mapController;
+  final Map<MarkerId, Marker> _mapMarkers = {};
+  final Map<PolylineId, Polyline> _polylines = {};
+
+  double? _passengerLat;
+  double? _passengerLng;
+  StreamSubscription? _locationSubscription;
+
+  double? _driverLat;
+  double? _driverLng;
+  StreamSubscription? _driverLocationSubscription;
+
+  Booking? _activeBooking;
+
+  // Bottom nav — index 2 = Bookings (current)
+  final int _currentIndex = 2;
+
+  static const String _apiKey =
+      'AIzaSyARq6dwj2ZA34rccWeY1EpynZA64YR9vY0';
+
+  @override
+  void initState() {
+    super.initState();
+    _tabController = TabController(length: 2, vsync: this);
+    WidgetsBinding.instance.addPostFrameCallback((_) {
+      Provider.of<BookingProvider>(context, listen: false)
+          .getPassengerBookings()
+          .then((_) {
+        _listenToBookingStatuses();
+        _startPassengerLocationTracking();
+      });
+    });
+  }
+
+  @override
+  void dispose() {
+    _tabController.dispose();
+    _locationSubscription?.cancel();
+    _driverLocationSubscription?.cancel();
+    _mapController?.dispose();
+    for (var sub in _bookingSubscriptions.values) {
+      sub.cancel();
+    }
+    final user = Provider.of<AuthProvider>(context, listen: false).user;
+    if (user != null) {
+      FirebaseService.removePassengerLocation(user.id);
+    }
+    super.dispose();
+  }
+
+  // ── Bottom nav handler ────────────────────────────────────────
+  void _onNavTap(int index) {
+    if (index == _currentIndex) return;
+    if (index == 0) {
+      Navigator.pushAndRemoveUntil(
+        context,
+        PageRouteBuilder(
+          pageBuilder: (_, animation, __) => FadeTransition(
+            opacity: animation,
+            child: const PassengerHomeScreen(),
+          ),
+          transitionDuration: const Duration(milliseconds: 300),
+        ),
+        (route) => false,
+      );
+      return;
+    }
+    if (index == 1) {
+      Navigator.pushReplacement(
+        context,
+        PageRouteBuilder(
+          pageBuilder: (_, animation, __) => FadeTransition(
+            opacity: animation,
+            child: const BookRideScreen(),
+          ),
+          transitionDuration: const Duration(milliseconds: 300),
+        ),
+      );
+      return;
+    }
+    if (index == 3) {
+      Navigator.pushReplacement(
+        context,
+        PageRouteBuilder(
+          pageBuilder: (_, animation, __) => FadeTransition(
+            opacity: animation,
+            child: const ProfileScreen(),
+          ),
+          transitionDuration: const Duration(milliseconds: 300),
+        ),
+      );
+      return;
+    }
+  }
+
+  // ── Logout confirmation dialog ────────────────────────────────
+  Future<void> _confirmLogout() async {
+    final confirmed = await showDialog<bool>(
+      context: context,
+      barrierDismissible: true,
+      barrierColor: Colors.black.withOpacity(0.5),
+      builder: (ctx) => Dialog(
+        backgroundColor: Colors.transparent,
+        elevation: 0,
+        child: Container(
+          padding: const EdgeInsets.all(28),
+          decoration: BoxDecoration(
+            color: Colors.white,
+            borderRadius: BorderRadius.circular(24),
+          ),
+          child: Column(
+            mainAxisSize: MainAxisSize.min,
+            children: [
+              Stack(
+                alignment: Alignment.center,
+                children: [
+                  Container(
+                    width: 80, height: 80,
+                    decoration: BoxDecoration(
+                      color: Colors.yellow[50],
+                      shape: BoxShape.circle,
+                    ),
+                  ),
+                  Container(
+                    width: 62, height: 62,
+                    decoration: BoxDecoration(
+                      color: Colors.yellow[100],
+                      shape: BoxShape.circle,
+                    ),
+                  ),
+                  Container(
+                    width: 46, height: 46,
+                    decoration: BoxDecoration(
+                      color: Colors.yellow[800],
+                      shape: BoxShape.circle,
+                    ),
+                    child: const Icon(Icons.logout_rounded,
+                        color: Colors.white, size: 22),
+                  ),
+                ],
+              ),
+              const SizedBox(height: 20),
+              const Text(
+                'Logging Out?',
+                style: TextStyle(
+                  fontSize: 20, fontWeight: FontWeight.w800,
+                  color: Colors.black87, letterSpacing: 0.2,
+                ),
+              ),
+              const SizedBox(height: 8),
+              Text(
+                'Would you like to logout from\nEasy Ride?',
+                textAlign: TextAlign.center,
+                style: TextStyle(
+                    fontSize: 14, color: Colors.grey[500], height: 1.5),
+              ),
+              const SizedBox(height: 28),
+              Row(
+                children: [
+                  Expanded(
+                    child: OutlinedButton(
+                      onPressed: () => Navigator.of(ctx).pop(false),
+                      style: OutlinedButton.styleFrom(
+                        padding: const EdgeInsets.symmetric(vertical: 14),
+                        side: BorderSide(color: Colors.grey.shade300),
+                        shape: RoundedRectangleBorder(
+                            borderRadius: BorderRadius.circular(14)),
+                        foregroundColor: Colors.black54,
+                      ),
+                      child: const Text('Cancel',
+                          style: TextStyle(
+                              fontSize: 15, fontWeight: FontWeight.w600)),
+                    ),
+                  ),
+                  const SizedBox(width: 12),
+                  Expanded(
+                    child: ElevatedButton(
+                      onPressed: () => Navigator.of(ctx).pop(true),
+                      style: ElevatedButton.styleFrom(
+                        backgroundColor: Colors.yellow[800],
+                        foregroundColor: Colors.white,
+                        elevation: 0,
+                        padding: const EdgeInsets.symmetric(vertical: 14),
+                        shape: RoundedRectangleBorder(
+                            borderRadius: BorderRadius.circular(14)),
+                      ),
+                      child: const Text('Yes, Logout',
+                          style: TextStyle(
+                              fontSize: 15, fontWeight: FontWeight.w600)),
+                    ),
+                  ),
+                ],
+              ),
+            ],
+          ),
+        ),
+      ),
+    );
+
+    if (confirmed == true && mounted) {
+      final authProvider =
+          Provider.of<AuthProvider>(context, listen: false);
+      await authProvider.logout();
+      if (mounted) {
+        Navigator.of(context).pushAndRemoveUntil(
+          PageRouteBuilder(
+            pageBuilder: (_, animation, __) => FadeTransition(
+              opacity: animation,
+              child: const LoginScreen(),
+            ),
+            transitionDuration: const Duration(milliseconds: 500),
+          ),
+          (route) => false,
+        );
+      }
+    }
+  }
+
+  bool _isToday(String createdAt) {
+    try {
+      final bookedDate = DateTime.parse(createdAt);
+      final now = DateTime.now();
+      return bookedDate.day == now.day &&
+          bookedDate.month == now.month &&
+          bookedDate.year == now.year;
+    } catch (e) {
+      return false;
+    }
+  }
+
+  bool _shouldShowDriver(Booking booking, String status) {
+    if (booking.bookingType == 'scheduled') {
+      return status == 'in_progress';
+    } else {
+      return status == 'accepted' || status == 'in_progress';
+    }
+  }
+
+  Future<void> _startPassengerLocationTracking() async {
+    final user = Provider.of<AuthProvider>(context, listen: false).user;
+    if (user == null) return;
+    try {
+      bool serviceEnabled = await Geolocator.isLocationServiceEnabled();
+      if (!serviceEnabled) return;
+      LocationPermission permission = await Geolocator.checkPermission();
+      if (permission == LocationPermission.denied) {
+        permission = await Geolocator.requestPermission();
+        if (permission == LocationPermission.denied) return;
+      }
+      final position = await Geolocator.getCurrentPosition(
+        desiredAccuracy: LocationAccuracy.high,
+      );
+      if (mounted) {
+        setState(() {
+          _passengerLat = position.latitude;
+          _passengerLng = position.longitude;
+        });
+        await FirebaseService.updatePassengerLocation(
+          passengerId: user.id,
+          latitude:    position.latitude,
+          longitude:   position.longitude,
+        );
+        _updateMapMarkers();
+        _mapController?.animateCamera(
+          CameraUpdate.newLatLngZoom(
+            LatLng(position.latitude, position.longitude), 15,
+          ),
+        );
+      }
+      _locationSubscription = Geolocator.getPositionStream(
+        locationSettings: const LocationSettings(
+          accuracy: LocationAccuracy.high,
+          distanceFilter: 5,
+        ),
+      ).listen((Position pos) async {
+        if (!mounted) return;
+        setState(() {
+          _passengerLat = pos.latitude;
+          _passengerLng = pos.longitude;
+        });
+        await FirebaseService.updatePassengerLocation(
+          passengerId: user.id,
+          latitude:    pos.latitude,
+          longitude:   pos.longitude,
+        );
+        _updateMapMarkers();
+        if (_driverLat != null && _driverLng != null) {
+          _drawRoute(
+            LatLng(_driverLat!, _driverLng!),
+            LatLng(pos.latitude, pos.longitude),
+          );
+        }
+      });
+    } catch (e) {
+      print('Location error: $e');
+    }
+  }
+
+  void _startDriverTracking(int driverFirebaseId) {
+    _driverLocationSubscription?.cancel();
+    _driverLocationSubscription = FirebaseDatabase.instance
+        .ref('drivers/$driverFirebaseId')
+        .onValue
+        .listen((event) {
+      if (!mounted) return;
+      final data = event.snapshot.value;
+      if (data == null) return;
+      final driverData = Map<String, dynamic>.from(data as Map);
+      final lat =
+          double.tryParse(driverData['latitude']?.toString() ?? '');
+      final lng =
+          double.tryParse(driverData['longitude']?.toString() ?? '');
+      if (lat != null && lng != null) {
+        setState(() {
+          _driverLat = lat;
+          _driverLng = lng;
+        });
+        _updateMapMarkers();
+        if (_passengerLat != null && _passengerLng != null) {
+          _drawRoute(
+            LatLng(lat, lng),
+            LatLng(_passengerLat!, _passengerLng!),
+          );
+        }
+      }
+    });
+  }
+
+  void _stopDriverTracking() {
+    _driverLocationSubscription?.cancel();
+    setState(() {
+      _activeBooking = null;
+      _driverLat     = null;
+      _driverLng     = null;
+      _polylines.clear();
+    });
+    _updateMapMarkers();
+  }
+
+  Future<void> _drawRoute(LatLng origin, LatLng destination) async {
+    try {
+      final url =
+          'https://maps.googleapis.com/maps/api/directions/json'
+          '?origin=${origin.latitude},${origin.longitude}'
+          '&destination=${destination.latitude},${destination.longitude}'
+          '&key=$_apiKey';
+      final response = await http.get(Uri.parse(url));
+      if (response.statusCode != 200) return;
+      final data = json.decode(response.body);
+      if (data['routes'].isEmpty) return;
+      final points =
+          data['routes'][0]['overview_polyline']['points'];
+      final polylinePoints = _decodePolyline(points);
+      if (!mounted) return;
+      setState(() {
+        _polylines.clear();
+        _polylines[const PolylineId('route')] = Polyline(
+          polylineId: const PolylineId('route'),
+          points: polylinePoints,
+          color: Colors.yellow[800]!,
+          width: 5,
+        );
+      });
+    } catch (e) {
+      print('Route error: $e');
+    }
+  }
+
+  List<LatLng> _decodePolyline(String encoded) {
+    List<LatLng> points = [];
+    int index = 0, len = encoded.length, lat = 0, lng = 0;
+    while (index < len) {
+      int b, shift = 0, result = 0;
+      do {
+        b = encoded.codeUnitAt(index++) - 63;
+        result |= (b & 0x1f) << shift;
+        shift += 5;
+      } while (b >= 0x20);
+      int dlat = ((result & 1) != 0 ? ~(result >> 1) : (result >> 1));
+      lat += dlat;
+      shift = 0;
+      result = 0;
+      do {
+        b = encoded.codeUnitAt(index++) - 63;
+        result |= (b & 0x1f) << shift;
+        shift += 5;
+      } while (b >= 0x20);
+      int dlng = ((result & 1) != 0 ? ~(result >> 1) : (result >> 1));
+      lng += dlng;
+      points.add(LatLng(lat / 1e5, lng / 1e5));
+    }
+    return points;
+  }
+
+  void _updateMapMarkers() {
+    if (!mounted) return;
+    final markers = <MarkerId, Marker>{};
+    if (_passengerLat != null && _passengerLng != null) {
+      const markerId = MarkerId('passenger');
+      markers[markerId] = Marker(
+        markerId: markerId,
+        position: LatLng(_passengerLat!, _passengerLng!),
+        infoWindow: const InfoWindow(title: 'My Location'),
+        icon: BitmapDescriptor.defaultMarkerWithHue(BitmapDescriptor.hueBlue),
+      );
+    }
+    if (_driverLat != null && _driverLng != null) {
+      const markerId = MarkerId('driver');
+      markers[markerId] = Marker(
+        markerId: markerId,
+        position: LatLng(_driverLat!, _driverLng!),
+        infoWindow: const InfoWindow(title: 'Your Driver'),
+        icon: BitmapDescriptor.defaultMarkerWithHue(BitmapDescriptor.hueGreen),
+      );
+    }
+    setState(() {
+      _mapMarkers.clear();
+      _mapMarkers.addAll(markers);
+    });
+  }
+
+  void _listenToBookingStatuses() {
+    final bookingProvider =
+        Provider.of<BookingProvider>(context, listen: false);
+    for (final booking in bookingProvider.bookings) {
+      _subscribeToBooking(booking);
+    }
+    for (final booking in bookingProvider.bookings) {
+      final status = booking.status;
+      if (_shouldShowDriver(booking, status) &&
+          _isToday(booking.createdAt)) {
+        setState(() => _activeBooking = booking);
+        if (booking.driverFirebaseId != null) {
+          _startDriverTracking(booking.driverFirebaseId!);
+        }
+        break;
+      }
+    }
+  }
+
+  void _subscribeToBooking(Booking booking) {
+    if (!_isToday(booking.createdAt) &&
+        (booking.status == 'completed' ||
+            booking.status == 'cancelled')) return;
+    _bookingSubscriptions[booking.id]?.cancel();
+    _bookingSubscriptions[booking.id] =
+        FirebaseService.getBookingStatusStream(booking.id)
+            .listen((DatabaseEvent event) {
+      if (!mounted) return;
+      final data = event.snapshot.value;
+      if (data != null) {
+        final bookingData = Map<String, dynamic>.from(data as Map);
+        final newStatus = bookingData['status'] ?? '';
+        if (newStatus.isNotEmpty &&
+            _firebaseStatuses[booking.id] != newStatus) {
+          setState(() => _firebaseStatuses[booking.id] = newStatus);
+          _showStatusChangeNotification(newStatus);
+          if (_shouldShowDriver(booking, newStatus) &&
+              booking.driverFirebaseId != null &&
+              _isToday(booking.createdAt)) {
+            setState(() => _activeBooking = booking);
+            _startDriverTracking(booking.driverFirebaseId!);
+          }
+          if (newStatus == 'completed' || newStatus == 'cancelled') {
+            _stopDriverTracking();
+            Provider.of<BookingProvider>(context, listen: false)
+                .getPassengerBookings();
+          }
+          if (booking.bookingType == 'scheduled' &&
+              newStatus == 'accepted') {
+            _stopDriverTracking();
+          }
+        }
+      }
+    });
+  }
+
+  String _getStatus(Booking booking) {
+    if (_isToday(booking.createdAt)) {
+      return _firebaseStatuses[booking.id] ?? booking.status;
+    }
+    return booking.status;
+  }
+
+  void _showStatusChangeNotification(String status) {
+    if (!mounted) return;
+    String message = '';
+    Color color = Colors.yellow[800]!;
+    switch (status) {
+      case 'accepted':
+        message = 'Driver accepted your booking!';
+        color = const Color(0xFF2E7D32);
+        break;
+      case 'in_progress':
+        message = 'Your ride has started!';
+        color = const Color(0xFF6A1B9A);
+        break;
+      case 'completed':
+        message = 'Ride completed! Please pay.';
+        color = const Color(0xFF2E7D32);
+        break;
+      case 'cancelled':
+        message = 'Booking was cancelled.';
+        color = Colors.grey[800]!;
+        break;
+    }
+    if (message.isNotEmpty) {
+      ScaffoldMessenger.of(context).showSnackBar(SnackBar(
+        content: Text(message),
+        backgroundColor: color,
+        duration: const Duration(seconds: 3),
+      ));
+    }
+  }
+
+  Color _getStatusColor(String status) {
+    switch (status) {
+      case 'pending':     return const Color(0xFFE65100);
+      case 'accepted':    return const Color(0xFF1565C0);
+      case 'in_progress': return const Color(0xFF6A1B9A);
+      case 'completed':   return const Color(0xFF2E7D32);
+      case 'cancelled':   return const Color(0xFFB71C1C);
+      default:            return Colors.grey;
+    }
+  }
+
+  IconData _getStatusIcon(String status) {
+    switch (status) {
+      case 'pending':     return Icons.hourglass_empty_rounded;
+      case 'accepted':    return Icons.check_circle_rounded;
+      case 'in_progress': return Icons.directions_car_rounded;
+      case 'completed':   return Icons.done_all_rounded;
+      case 'cancelled':   return Icons.cancel_rounded;
+      default:            return Icons.info_rounded;
+    }
+  }
+
+  String _getStatusLabel(String status) {
+    switch (status) {
+      case 'pending':     return 'Pending';
+      case 'accepted':    return 'Accepted';
+      case 'in_progress': return 'On the Way';
+      case 'completed':   return 'Completed';
+      case 'cancelled':   return 'Cancelled';
+      default:            return status;
+    }
+  }
+
+  Future<void> _deleteBooking(
+      BuildContext context, int bookingId) async {
+    final confirmed = await showDialog<bool>(
+      context: context,
+      barrierColor: Colors.black.withOpacity(0.5),
+      builder: (ctx) => Dialog(
+        backgroundColor: Colors.transparent,
+        elevation: 0,
+        child: Container(
+          padding: const EdgeInsets.all(28),
+          decoration: BoxDecoration(
+            color: Colors.white,
+            borderRadius: BorderRadius.circular(24),
+          ),
+          child: Column(
+            mainAxisSize: MainAxisSize.min,
+            children: [
+              Container(
+                width: 56, height: 56,
+                decoration: BoxDecoration(
+                  color: Colors.red[50],
+                  shape: BoxShape.circle,
+                ),
+                child: Icon(Icons.delete_outline_rounded,
+                    color: Colors.red[400], size: 28),
+              ),
+              const SizedBox(height: 16),
+              const Text(
+                'Remove Booking',
+                style: TextStyle(
+                    fontSize: 18, fontWeight: FontWeight.w700,
+                    color: Colors.black87),
+              ),
+              const SizedBox(height: 8),
+              Text(
+                'Remove this booking from your list?\nThis cannot be undone.',
+                textAlign: TextAlign.center,
+                style: TextStyle(
+                    fontSize: 14, color: Colors.grey[500], height: 1.5),
+              ),
+              const SizedBox(height: 24),
+              Row(children: [
+                Expanded(
+                  child: OutlinedButton(
+                    onPressed: () => Navigator.of(ctx).pop(false),
+                    style: OutlinedButton.styleFrom(
+                      padding: const EdgeInsets.symmetric(vertical: 13),
+                      side: BorderSide(color: Colors.grey.shade300),
+                      shape: RoundedRectangleBorder(
+                          borderRadius: BorderRadius.circular(12)),
+                      foregroundColor: Colors.black54,
+                    ),
+                    child: const Text('Cancel',
+                        style: TextStyle(
+                            fontSize: 14, fontWeight: FontWeight.w600)),
+                  ),
+                ),
+                const SizedBox(width: 12),
+                Expanded(
+                  child: ElevatedButton(
+                    onPressed: () => Navigator.of(ctx).pop(true),
+                    style: ElevatedButton.styleFrom(
+                      backgroundColor: Colors.red[400],
+                      foregroundColor: Colors.white,
+                      elevation: 0,
+                      padding: const EdgeInsets.symmetric(vertical: 13),
+                      shape: RoundedRectangleBorder(
+                          borderRadius: BorderRadius.circular(12)),
+                    ),
+                    child: const Text('Remove',
+                        style: TextStyle(
+                            fontSize: 14, fontWeight: FontWeight.w600)),
+                  ),
+                ),
+              ]),
+            ],
+          ),
+        ),
+      ),
+    );
+
+    if (confirmed == true && context.mounted) {
+      final bookingProvider =
+          Provider.of<BookingProvider>(context, listen: false);
+      try {
+        await bookingProvider.deleteBooking(bookingId);
+        if (context.mounted) {
+          ScaffoldMessenger.of(context).showSnackBar(
+            SnackBar(
+              content: const Text('Booking removed'),
+              backgroundColor: Colors.grey[800],
+            ),
+          );
+        }
+      } catch (e) {
+        if (context.mounted) {
+          ScaffoldMessenger.of(context).showSnackBar(
+            SnackBar(
+              content: Text('Error: $e'),
+              backgroundColor: Colors.grey[800],
+            ),
+          );
+        }
+      }
+    }
+  }
+
+  Future<void> _cancelBooking(
+      BuildContext context, int bookingId) async {
+    final confirmed = await showDialog<bool>(
+      context: context,
+      barrierColor: Colors.black.withOpacity(0.5),
+      builder: (ctx) => Dialog(
+        backgroundColor: Colors.transparent,
+        elevation: 0,
+        child: Container(
+          padding: const EdgeInsets.all(28),
+          decoration: BoxDecoration(
+            color: Colors.white,
+            borderRadius: BorderRadius.circular(24),
+          ),
+          child: Column(
+            mainAxisSize: MainAxisSize.min,
+            children: [
+              Stack(alignment: Alignment.center, children: [
+                Container(
+                  width: 80, height: 80,
+                  decoration: BoxDecoration(
+                    color: Colors.red[50], shape: BoxShape.circle),
+                ),
+                Container(
+                  width: 62, height: 62,
+                  decoration: BoxDecoration(
+                    color: Colors.red[100], shape: BoxShape.circle),
+                ),
+                Container(
+                  width: 46, height: 46,
+                  decoration: BoxDecoration(
+                    color: Colors.red[400], shape: BoxShape.circle),
+                  child: const Icon(Icons.cancel_rounded,
+                      color: Colors.white, size: 22),
+                ),
+              ]),
+              const SizedBox(height: 20),
+              const Text(
+                'Cancel Booking?',
+                style: TextStyle(
+                    fontSize: 20, fontWeight: FontWeight.w800,
+                    color: Colors.black87),
+              ),
+              const SizedBox(height: 8),
+              Text(
+                'Are you sure you want to\ncancel this booking?',
+                textAlign: TextAlign.center,
+                style: TextStyle(
+                    fontSize: 14, color: Colors.grey[500], height: 1.5),
+              ),
+              const SizedBox(height: 28),
+              Row(children: [
+                Expanded(
+                  child: OutlinedButton(
+                    onPressed: () => Navigator.of(ctx).pop(false),
+                    style: OutlinedButton.styleFrom(
+                      padding: const EdgeInsets.symmetric(vertical: 14),
+                      side: BorderSide(color: Colors.grey.shade300),
+                      shape: RoundedRectangleBorder(
+                          borderRadius: BorderRadius.circular(14)),
+                      foregroundColor: Colors.black54,
+                    ),
+                    child: const Text('No',
+                        style: TextStyle(
+                            fontSize: 15, fontWeight: FontWeight.w600)),
+                  ),
+                ),
+                const SizedBox(width: 12),
+                Expanded(
+                  child: ElevatedButton(
+                    onPressed: () => Navigator.of(ctx).pop(true),
+                    style: ElevatedButton.styleFrom(
+                      backgroundColor: Colors.red[400],
+                      foregroundColor: Colors.white,
+                      elevation: 0,
+                      padding: const EdgeInsets.symmetric(vertical: 14),
+                      shape: RoundedRectangleBorder(
+                          borderRadius: BorderRadius.circular(14)),
+                    ),
+                    child: const Text('Yes, Cancel',
+                        style: TextStyle(
+                            fontSize: 15, fontWeight: FontWeight.w600)),
+                  ),
+                ),
+              ]),
+            ],
+          ),
+        ),
+      ),
+    );
+
+    if (confirmed == true && context.mounted) {
+      final bookingProvider =
+          Provider.of<BookingProvider>(context, listen: false);
+      final success = await bookingProvider.cancelBooking(bookingId);
+      if (success && context.mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(
+            content: const Text('Booking cancelled'),
+            backgroundColor: Colors.grey[800],
+          ),
+        );
+      }
+    }
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    final bookingProvider = Provider.of<BookingProvider>(context);
+    final currentBookings =
+        bookingProvider.bookings.where((b) => b.bookingType == 'now').toList();
+    final scheduledBookings = bookingProvider.bookings
+        .where((b) => b.bookingType == 'scheduled')
+        .toList();
+    final hasActiveRide = _activeBooking != null;
+
+    final activeCount = currentBookings
+        .where((b) =>
+            _getStatus(b) == 'pending' ||
+            _getStatus(b) == 'accepted' ||
+            _getStatus(b) == 'in_progress')
+        .length;
+    final scheduledPendingCount =
+        scheduledBookings.where((b) => _getStatus(b) == 'pending').length;
+
+    return Scaffold(
+      backgroundColor: const Color(0xFFF4F4F6),
+
+      // ── APP BAR ────────────────────────────────────────────
+      appBar: AppBar(
+        backgroundColor: Colors.white,
+        elevation: 0,
+        centerTitle: false,
+        titleSpacing: 20,
+        automaticallyImplyLeading: false,
+        title: Row(
+          mainAxisSize: MainAxisSize.min,
+          children: [
+            Image.asset(
+              'assets/images/taxi_logo.png',
+              width: 36,
+              height: 36,
+              fit: BoxFit.contain,
+            ),
+            const SizedBox(width: 10),
+            const Text(
+              'Easy Ride',
+              style: TextStyle(
+                color: Colors.black87,
+                fontWeight: FontWeight.w800,
+                fontSize: 19,
+                letterSpacing: 0.3,
+              ),
+            ),
+          ],
+        ),
+        actions: [
+          // Live indicator
+          Row(children: [
+            Container(
+              width: 7, height: 7,
+              decoration: const BoxDecoration(
+                  color: Color(0xFF4CAF50), shape: BoxShape.circle),
+            ),
+            const SizedBox(width: 5),
+            const Text('Live',
+                style: TextStyle(
+                    color: Color(0xFF4CAF50),
+                    fontSize: 12,
+                    fontWeight: FontWeight.w600)),
+            const SizedBox(width: 8),
+          ]),
+          // Refresh
+          InkWell(
+            onTap: () => bookingProvider
+                .getPassengerBookings()
+                .then((_) => _listenToBookingStatuses()),
+            borderRadius: BorderRadius.circular(8),
+            child: Padding(
+              padding: const EdgeInsets.all(8),
+              child: Icon(Icons.refresh_rounded,
+                  color: Colors.grey[600], size: 20),
+            ),
+          ),
+          // Logout
+          Padding(
+            padding: const EdgeInsets.only(right: 12, left: 4),
+            child: InkWell(
+              onTap: _confirmLogout,
+              borderRadius: BorderRadius.circular(10),
+              child: Container(
+                padding: const EdgeInsets.symmetric(
+                    horizontal: 12, vertical: 8),
+                decoration: BoxDecoration(
+                  color: Colors.grey[100],
+                  borderRadius: BorderRadius.circular(10),
+                  border: Border.all(color: Colors.grey.shade200),
+                ),
+                child: Row(
+                  mainAxisSize: MainAxisSize.min,
+                  children: [
+                    Icon(Icons.logout_rounded,
+                        color: Colors.grey[600], size: 16),
+                    const SizedBox(width: 5),
+                    Text(
+                      'Logout',
+                      style: TextStyle(
+                        fontSize: 13,
+                        fontWeight: FontWeight.w600,
+                        color: Colors.grey[700],
+                      ),
+                    ),
+                  ],
+                ),
+              ),
+            ),
+          ),
+        ],
+        // ── TAB BAR ─────────────────────────────────────────
+        bottom: PreferredSize(
+          preferredSize: const Size.fromHeight(52),
+          child: Container(
+            color: Colors.white,
+            child: TabBar(
+              controller: _tabController,
+              indicatorColor: Colors.yellow[800],
+              indicatorWeight: 3,
+              labelColor: Colors.yellow[800],
+              unselectedLabelColor: Colors.grey[500],
+              labelStyle: const TextStyle(
+                  fontSize: 13, fontWeight: FontWeight.w700),
+              unselectedLabelStyle: const TextStyle(
+                  fontSize: 13, fontWeight: FontWeight.w500),
+              tabs: [
+                Tab(
+                  child: Row(
+                    mainAxisAlignment: MainAxisAlignment.center,
+                    children: [
+                      const Icon(Icons.directions_car_rounded, size: 16),
+                      const SizedBox(width: 6),
+                      const Text('Current'),
+                      if (activeCount > 0) ...[
+                        const SizedBox(width: 6),
+                        Container(
+                          padding: const EdgeInsets.symmetric(
+                              horizontal: 6, vertical: 2),
+                          decoration: BoxDecoration(
+                              color: Colors.yellow[800],
+                              borderRadius: BorderRadius.circular(10)),
+                          child: Text('$activeCount',
+                              style: const TextStyle(
+                                  color: Colors.white, fontSize: 10)),
+                        ),
+                      ],
+                    ],
+                  ),
+                ),
+                Tab(
+                  child: Row(
+                    mainAxisAlignment: MainAxisAlignment.center,
+                    children: [
+                      const Icon(Icons.calendar_today_rounded, size: 16),
+                      const SizedBox(width: 6),
+                      const Text('Scheduled'),
+                      if (scheduledPendingCount > 0) ...[
+                        const SizedBox(width: 6),
+                        Container(
+                          padding: const EdgeInsets.symmetric(
+                              horizontal: 6, vertical: 2),
+                          decoration: BoxDecoration(
+                              color: Colors.yellow[800],
+                              borderRadius: BorderRadius.circular(10)),
+                          child: Text('$scheduledPendingCount',
+                              style: const TextStyle(
+                                  color: Colors.white, fontSize: 10)),
+                        ),
+                      ],
+                    ],
+                  ),
+                ),
+              ],
+            ),
+          ),
+        ),
+      ),
+
+      // ── BOTTOM NAVIGATION BAR ──────────────────────────────
+      bottomNavigationBar: Container(
+        decoration: BoxDecoration(
+          color: Colors.white,
+          border: Border(
+            top: BorderSide(color: Colors.grey.shade100, width: 1),
+          ),
+        ),
+        child: BottomNavigationBar(
+          currentIndex: _currentIndex,
+          onTap: _onNavTap,
+          type: BottomNavigationBarType.fixed,
+          backgroundColor: Colors.white,
+          selectedItemColor: Colors.yellow[800],
+          unselectedItemColor: Colors.grey[400],
+          selectedLabelStyle: const TextStyle(
+              fontSize: 11, fontWeight: FontWeight.w700),
+          unselectedLabelStyle: const TextStyle(
+              fontSize: 11, fontWeight: FontWeight.w500),
+          elevation: 0,
+          items: const [
+            BottomNavigationBarItem(
+              icon: Icon(Icons.home_outlined),
+              activeIcon: Icon(Icons.home_rounded),
+              label: 'Home',
+            ),
+            BottomNavigationBarItem(
+              icon: Icon(Icons.local_taxi_outlined),
+              activeIcon: Icon(Icons.local_taxi_rounded),
+              label: 'Book Ride',
+            ),
+            BottomNavigationBarItem(
+              icon: Icon(Icons.receipt_long_outlined),
+              activeIcon: Icon(Icons.receipt_long_rounded),
+              label: 'Bookings',
+            ),
+            BottomNavigationBarItem(
+              icon: Icon(Icons.person_outline_rounded),
+              activeIcon: Icon(Icons.person_rounded),
+              label: 'Profile',
+            ),
+          ],
+        ),
+      ),
+
+      // ── BODY ───────────────────────────────────────────────
+      body: bookingProvider.isLoading
+          ? Center(
+              child: CircularProgressIndicator(
+                valueColor:
+                    AlwaysStoppedAnimation<Color>(Colors.yellow[800]!),
+              ),
+            )
+          : Column(
+              children: [
+
+                // ── MAP ───────────────────────────────────────
+                ClipRRect(
+                  borderRadius: const BorderRadius.only(
+                    bottomLeft: Radius.circular(16),
+                    bottomRight: Radius.circular(16),
+                  ),
+                  child: SizedBox(
+                    height: 190,
+                    child: _passengerLat != null
+                        ? GoogleMap(
+                            initialCameraPosition: CameraPosition(
+                              target:
+                                  LatLng(_passengerLat!, _passengerLng!),
+                              zoom: 15,
+                            ),
+                            onMapCreated: (c) => _mapController = c,
+                            mapType: MapType.hybrid,
+                            markers:
+                                Set<Marker>.of(_mapMarkers.values),
+                            polylines:
+                                Set<Polyline>.of(_polylines.values),
+                            myLocationEnabled: true,
+                            myLocationButtonEnabled: false,
+                            zoomControlsEnabled: false,
+                            mapToolbarEnabled: false,
+                          )
+                        : Container(
+                            color: Colors.grey.shade200,
+                            child: Column(
+                              mainAxisAlignment:
+                                  MainAxisAlignment.center,
+                              children: [
+                                CircularProgressIndicator(
+                                  valueColor:
+                                      AlwaysStoppedAnimation<Color>(
+                                          Colors.yellow[800]!),
+                                ),
+                                const SizedBox(height: 10),
+                                Text(
+                                  'Getting your location...',
+                                  style: TextStyle(
+                                      color: Colors.grey[500],
+                                      fontSize: 13),
+                                ),
+                              ],
+                            ),
+                          ),
+                  ),
+                ),
+
+                // ── MAP LEGEND ────────────────────────────────
+                Container(
+                  color: Colors.white,
+                  padding: const EdgeInsets.symmetric(
+                      horizontal: 16, vertical: 8),
+                  child: Row(children: [
+                    Container(
+                      width: 8, height: 8,
+                      decoration: const BoxDecoration(
+                          color: Colors.blue, shape: BoxShape.circle),
+                    ),
+                    const SizedBox(width: 5),
+                    Text('You',
+                        style: TextStyle(
+                            fontSize: 12, color: Colors.grey[600])),
+                    if (hasActiveRide) ...[
+                      const SizedBox(width: 14),
+                      Container(
+                        width: 8, height: 8,
+                        decoration: const BoxDecoration(
+                            color: Color(0xFF4CAF50),
+                            shape: BoxShape.circle),
+                      ),
+                      const SizedBox(width: 5),
+                      Text('Driver',
+                          style: TextStyle(
+                              fontSize: 12, color: Colors.grey[600])),
+                      const SizedBox(width: 14),
+                      Container(
+                          width: 18, height: 3,
+                          color: Colors.yellow[800]),
+                      const SizedBox(width: 5),
+                      Text('Route',
+                          style: TextStyle(
+                              fontSize: 12, color: Colors.grey[600])),
+                    ],
+                  ]),
+                ),
+
+                // ── TAB VIEW ─────────────────────────────────
+                Expanded(
+                  child: TabBarView(
+                    controller: _tabController,
+                    children: [
+                      _buildBookingList(
+                          context, currentBookings, 'now'),
+                      _buildBookingList(
+                          context, scheduledBookings, 'scheduled'),
+                    ],
+                  ),
+                ),
+              ],
+            ),
+    );
+  }
+
+  Widget _buildBookingList(
+      BuildContext context, List<Booking> bookings, String type) {
+    final bookingProvider =
+        Provider.of<BookingProvider>(context, listen: false);
+
+    if (bookings.isEmpty) {
+      return Center(
+        child: Column(
+          mainAxisAlignment: MainAxisAlignment.center,
+          children: [
+            Container(
+              width: 80, height: 80,
+              decoration: BoxDecoration(
+                color: Colors.grey[100],
+                shape: BoxShape.circle,
+              ),
+              child: Icon(
+                type == 'now'
+                    ? Icons.directions_car_rounded
+                    : Icons.calendar_today_rounded,
+                size: 38,
+                color: Colors.grey[300],
+              ),
+            ),
+            const SizedBox(height: 16),
+            Text(
+              type == 'now' ? 'No current rides' : 'No scheduled rides',
+              style: TextStyle(
+                  fontSize: 16,
+                  fontWeight: FontWeight.w600,
+                  color: Colors.grey[500]),
+            ),
+            const SizedBox(height: 6),
+            Text(
+              type == 'now'
+                  ? 'Book a ride to get started!'
+                  : 'Schedule a future ride!',
+              style: TextStyle(fontSize: 13, color: Colors.grey[400]),
+            ),
+          ],
+        ),
+      );
+    }
+
+    return RefreshIndicator(
+      color: Colors.yellow[800],
+      onRefresh: () => bookingProvider
+          .getPassengerBookings()
+          .then((_) => _listenToBookingStatuses()),
+      child: ListView.builder(
+        padding: const EdgeInsets.fromLTRB(16, 14, 16, 24),
+        itemCount: bookings.length,
+        itemBuilder: (context, index) =>
+            _buildBookingCard(context, bookings[index]),
+      ),
+    );
+  }
+
+  Widget _buildBookingCard(BuildContext context, Booking booking) {
+    final status      = _getStatus(booking);
+    final statusColor = _getStatusColor(status);
+    final statusLabel = _getStatusLabel(status);
+    final isCancelled  = status == 'cancelled';
+    final isPending    = status == 'pending';
+    final isAccepted   = status == 'accepted';
+    final isInProgress = status == 'in_progress';
+    final isCompleted  = status == 'completed';
+    final isScheduled  = booking.bookingType == 'scheduled';
+
+    return Container(
+      margin: const EdgeInsets.only(bottom: 14),
+      decoration: BoxDecoration(
+        color: Colors.white,
+        borderRadius: BorderRadius.circular(18),
+        border: Border.all(color: Colors.grey.shade100),
+      ),
+      child: Padding(
+        padding: const EdgeInsets.all(18),
+        child: Column(
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+
+            // ── Header row ──────────────────────────────────
+            Row(
+              mainAxisAlignment: MainAxisAlignment.spaceBetween,
+              children: [
+                // Status badge
+                Container(
+                  padding: const EdgeInsets.symmetric(
+                      horizontal: 12, vertical: 6),
+                  decoration: BoxDecoration(
+                    color: statusColor.withOpacity(0.08),
+                    borderRadius: BorderRadius.circular(20),
+                    border: Border.all(
+                        color: statusColor.withOpacity(0.3)),
+                  ),
+                  child: Row(
+                    mainAxisSize: MainAxisSize.min,
+                    children: [
+                      Icon(_getStatusIcon(status),
+                          size: 14, color: statusColor),
+                      const SizedBox(width: 5),
+                      Text(statusLabel,
+                          style: TextStyle(
+                              color: statusColor,
+                              fontWeight: FontWeight.w700,
+                              fontSize: 12)),
+                    ],
+                  ),
+                ),
+                Text(
+                  '#${booking.id}',
+                  style: TextStyle(
+                      color: Colors.grey[400],
+                      fontSize: 12,
+                      fontWeight: FontWeight.w500),
+                ),
+              ],
+            ),
+
+            const SizedBox(height: 14),
+
+            // ── Scheduled info ───────────────────────────────
+            if (isScheduled &&
+                booking.scheduledDate != null &&
+                booking.scheduledTime != null) ...[
+              Container(
+                width: double.infinity,
+                padding: const EdgeInsets.all(12),
+                margin: const EdgeInsets.only(bottom: 12),
+                decoration: BoxDecoration(
+                  color: const Color(0xFFEDE7F6),
+                  borderRadius: BorderRadius.circular(12),
+                ),
+                child: Row(children: [
+                  const Icon(Icons.calendar_today_rounded,
+                      color: Color(0xFF5E35B1), size: 16),
+                  const SizedBox(width: 10),
+                  Column(
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    children: [
+                      const Text('Scheduled for',
+                          style: TextStyle(
+                              color: Color(0xFF5E35B1), fontSize: 11)),
+                      Text(
+                        '${_formatScheduledDate(booking.scheduledDate!)}  •  ${_formatScheduledTime(booking.scheduledTime!)}',
+                        style: const TextStyle(
+                            color: Color(0xFF4527A0),
+                            fontWeight: FontWeight.w700,
+                            fontSize: 13),
+                      ),
+                    ],
+                  ),
+                ]),
+              ),
+            ],
+
+            // ── Status banners ───────────────────────────────
+            if (isCancelled)
+              _buildInfoBanner(
+                  color: const Color(0xFFB71C1C),
+                  icon: Icons.info_outline_rounded,
+                  message: 'This booking was cancelled.'),
+            if (isAccepted && !isScheduled)
+              _buildInfoBanner(
+                  color: const Color(0xFF1565C0),
+                  icon: Icons.check_circle_rounded,
+                  message:
+                      'Driver accepted! They are on their way.'),
+            if (isAccepted && isScheduled)
+              _buildInfoBanner(
+                  color: const Color(0xFF1565C0),
+                  icon: Icons.check_circle_rounded,
+                  message:
+                      'Driver accepted! They will arrive at the scheduled time.'),
+            if (isInProgress)
+              _buildInfoBanner(
+                  color: const Color(0xFF6A1B9A),
+                  icon: Icons.directions_car_rounded,
+                  message: 'Your ride has started! Driver is on the map.'),
+            if (isCompleted)
+              _buildInfoBanner(
+                  color: const Color(0xFF2E7D32),
+                  icon: Icons.done_all_rounded,
+                  message: 'Ride completed! Thank you.'),
+
+            // ── Route ────────────────────────────────────────
+            Row(children: [
+              Container(
+                width: 8, height: 8,
+                decoration: const BoxDecoration(
+                    color: Color(0xFF4CAF50), shape: BoxShape.circle),
+              ),
+              const SizedBox(width: 10),
+              Expanded(
+                child: Text(
+                  booking.pickupLocation,
+                  style: const TextStyle(
+                      fontWeight: FontWeight.w600,
+                      fontSize: 13,
+                      color: Colors.black87),
+                ),
+              ),
+            ]),
+            Padding(
+              padding: const EdgeInsets.only(left: 3.5),
+              child: Column(children: [
+                Container(width: 1, height: 10, color: Colors.grey[300]),
+              ]),
+            ),
+            Row(children: [
+              Container(
+                width: 8, height: 8,
+                decoration: BoxDecoration(
+                    color: Colors.yellow[800], shape: BoxShape.circle),
+              ),
+              const SizedBox(width: 10),
+              Expanded(
+                child: Text(
+                  booking.dropoffLocation,
+                  style: const TextStyle(
+                      fontWeight: FontWeight.w600,
+                      fontSize: 13,
+                      color: Colors.black87),
+                ),
+              ),
+            ]),
+
+            const SizedBox(height: 14),
+
+            // ── Footer row ───────────────────────────────────
+            Row(
+              mainAxisAlignment: MainAxisAlignment.spaceBetween,
+              children: [
+                // Vehicle type
+                Container(
+                  padding: const EdgeInsets.symmetric(
+                      horizontal: 10, vertical: 5),
+                  decoration: BoxDecoration(
+                    color: Colors.grey[100],
+                    borderRadius: BorderRadius.circular(8),
+                  ),
+                  child: Row(children: [
+                    Icon(Icons.directions_car_outlined,
+                        size: 14, color: Colors.grey[600]),
+                    const SizedBox(width: 5),
+                    Text(
+                      booking.vehicleType,
+                      style: TextStyle(
+                          fontSize: 12,
+                          color: Colors.grey[700],
+                          fontWeight: FontWeight.w500),
+                    ),
+                  ]),
+                ),
+                // Price
+                Text(
+                  'Nu. ${booking.finalPrice ?? booking.estimatedPrice}',
+                  style: TextStyle(
+                    fontSize: 18,
+                    fontWeight: FontWeight.w800,
+                    color: Colors.yellow[800],
+                  ),
+                ),
+              ],
+            ),
+
+            const SizedBox(height: 8),
+
+            Text(
+              'Booked: ${_formatDate(booking.createdAt)}',
+              style: TextStyle(fontSize: 11, color: Colors.grey[400]),
+            ),
+
+            // ── Cancel button ────────────────────────────────
+            if (isPending) ...[
+              const SizedBox(height: 14),
+              SizedBox(
+                width: double.infinity,
+                height: 44,
+                child: OutlinedButton.icon(
+                  onPressed: () =>
+                      _cancelBooking(context, booking.id),
+                  icon: const Icon(Icons.cancel_outlined, size: 16),
+                  label: const Text('Cancel Booking'),
+                  style: OutlinedButton.styleFrom(
+                    foregroundColor: Colors.red[400],
+                    side: BorderSide(color: Colors.red.shade200),
+                    shape: RoundedRectangleBorder(
+                        borderRadius: BorderRadius.circular(12)),
+                  ),
+                ),
+              ),
+            ],
+
+            // ── Cancelled actions ────────────────────────────
+            if (isCancelled) ...[
+              const SizedBox(height: 14),
+              SizedBox(
+                width: double.infinity,
+                height: 44,
+                child: ElevatedButton.icon(
+                  onPressed: () => _onNavTap(1),
+                  icon: const Icon(Icons.refresh_rounded, size: 16),
+                  label: const Text('Book Another Ride'),
+                  style: ElevatedButton.styleFrom(
+                    backgroundColor: Colors.yellow[800],
+                    foregroundColor: Colors.white,
+                    elevation: 0,
+                    shape: RoundedRectangleBorder(
+                        borderRadius: BorderRadius.circular(12)),
+                  ),
+                ),
+              ),
+              const SizedBox(height: 8),
+              SizedBox(
+                width: double.infinity,
+                height: 44,
+                child: OutlinedButton.icon(
+                  onPressed: () =>
+                      _deleteBooking(context, booking.id),
+                  icon: Icon(Icons.delete_outline_rounded,
+                      size: 16, color: Colors.grey[500]),
+                  label: Text('Remove from list',
+                      style: TextStyle(color: Colors.grey[600])),
+                  style: OutlinedButton.styleFrom(
+                    side: BorderSide(color: Colors.grey.shade200),
+                    shape: RoundedRectangleBorder(
+                        borderRadius: BorderRadius.circular(12)),
+                  ),
+                ),
+              ),
+            ],
+
+            // ── Completed remove ─────────────────────────────
+            if (isCompleted) ...[
+              const SizedBox(height: 14),
+              SizedBox(
+                width: double.infinity,
+                height: 44,
+                child: OutlinedButton.icon(
+                  onPressed: () =>
+                      _deleteBooking(context, booking.id),
+                  icon: Icon(Icons.delete_outline_rounded,
+                      size: 16, color: Colors.grey[500]),
+                  label: Text('Remove from list',
+                      style: TextStyle(color: Colors.grey[600])),
+                  style: OutlinedButton.styleFrom(
+                    side: BorderSide(color: Colors.grey.shade200),
+                    shape: RoundedRectangleBorder(
+                        borderRadius: BorderRadius.circular(12)),
+                  ),
+                ),
+              ),
+            ],
+          ],
+        ),
+      ),
+    );
+  }
+
+  Widget _buildInfoBanner({
+    required Color color,
+    required IconData icon,
+    required String message,
+  }) {
+    return Container(
+      width: double.infinity,
+      padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 10),
+      margin: const EdgeInsets.only(bottom: 12),
+      decoration: BoxDecoration(
+        color: color.withOpacity(0.07),
+        borderRadius: BorderRadius.circular(10),
+        border: Border.all(color: color.withOpacity(0.2)),
+      ),
+      child: Row(children: [
+        Icon(icon, color: color, size: 16),
+        const SizedBox(width: 8),
+        Expanded(
+          child: Text(
+            message,
+            style: TextStyle(
+                color: color,
+                fontSize: 12,
+                fontWeight: FontWeight.w500),
+          ),
+        ),
+      ]),
+    );
+  }
+
+  String _formatDate(String dateStr) {
+    try {
+      final date = DateTime.parse(dateStr);
+      return '${date.day}/${date.month}/${date.year} '
+          '${date.hour}:${date.minute.toString().padLeft(2, '0')}';
+    } catch (e) {
+      return dateStr;
+    }
+  }
+
+  String _formatScheduledDate(String dateStr) {
+    try {
+      final date = DateTime.parse(dateStr);
+      const days = [
+        'Monday', 'Tuesday', 'Wednesday',
+        'Thursday', 'Friday', 'Saturday', 'Sunday'
+      ];
+      const months = [
+        'Jan', 'Feb', 'Mar', 'Apr', 'May', 'Jun',
+        'Jul', 'Aug', 'Sep', 'Oct', 'Nov', 'Dec'
+      ];
+      return '${days[date.weekday - 1]}, ${date.day} ${months[date.month - 1]} ${date.year}';
+    } catch (e) {
+      return dateStr;
+    }
+  }
+
+  String _formatScheduledTime(String timeStr) {
+    try {
+      final parts = timeStr.split(':');
+      final hour = int.parse(parts[0]);
+      final minute = parts[1].padLeft(2, '0');
+      final period = hour >= 12 ? 'PM' : 'AM';
+      final displayHour =
+          hour > 12 ? hour - 12 : hour == 0 ? 12 : hour;
+      return '$displayHour:$minute $period';
+    } catch (e) {
+      return timeStr;
+    }
+  }
+}

@@ -1,0 +1,490 @@
+import 'dart:io';
+import 'package:flutter/material.dart';
+import 'package:provider/provider.dart';
+import 'package:image_picker/image_picker.dart';
+import 'package:http/http.dart' as http;
+import '../providers/driver_provider.dart';
+import '../services/api_service.dart';
+
+class DriverPaymentDetailsScreen extends StatefulWidget {
+  const DriverPaymentDetailsScreen({super.key});
+
+  @override
+  State<DriverPaymentDetailsScreen> createState() =>
+      _DriverPaymentDetailsScreenState();
+}
+
+class _DriverPaymentDetailsScreenState
+    extends State<DriverPaymentDetailsScreen> {
+  final _formKey           = GlobalKey<FormState>();
+  final _bankNameController        = TextEditingController();
+  final _accountHolderController   = TextEditingController();
+  final _accountNumberController   = TextEditingController();
+  final _mobileNumberController    = TextEditingController();
+  final ApiService _apiService     = ApiService();
+
+  bool _isLoading      = false;
+  bool _isUploadingQR  = false;
+  File? _qrCodeFile;
+
+  @override
+  void initState() {
+    super.initState();
+    WidgetsBinding.instance.addPostFrameCallback((_) {
+      _loadProfile();
+    });
+  }
+
+  void _loadProfile() {
+    final driverProvider =
+        Provider.of<DriverProvider>(context, listen: false);
+    driverProvider.getProfile().then((_) {
+      final profile = driverProvider.driverProfile;
+      if (profile != null) {
+        _bankNameController.text =
+            profile['bank_name'] ?? '';
+        _accountHolderController.text =
+            profile['account_holder_name'] ?? '';
+        _accountNumberController.text =
+            profile['account_number'] ?? '';
+        _mobileNumberController.text =
+            profile['mobile_payment_number'] ?? '';
+      }
+    });
+  }
+
+  @override
+  void dispose() {
+    _bankNameController.dispose();
+    _accountHolderController.dispose();
+    _accountNumberController.dispose();
+    _mobileNumberController.dispose();
+    super.dispose();
+  }
+
+  Future<void> _pickQRCode() async {
+    final ImagePicker picker = ImagePicker();
+    final XFile? image = await picker.pickImage(
+      source: ImageSource.gallery,
+      imageQuality: 80,
+    );
+    if (image != null) {
+      setState(() {
+        _qrCodeFile = File(image.path);
+      });
+    }
+  }
+
+  // ✅ Upload QR code separately and permanently
+  Future<void> _uploadQRCode() async {
+    if (_qrCodeFile == null) return;
+
+    setState(() => _isUploadingQR = true);
+
+    try {
+      final token = await _apiService.getToken();
+      final request = http.MultipartRequest(
+        'POST',
+        Uri.parse('${ApiService.baseUrl}/driver/upload-qr'),
+      );
+      request.headers.addAll({
+        'Accept': 'application/json',
+        if (token != null) 'Authorization': 'Bearer $token',
+      });
+      request.files.add(
+        await http.MultipartFile.fromPath(
+          'qr_code',
+          _qrCodeFile!.path,
+        ),
+      );
+      final response = await request.send();
+
+      if (mounted) {
+        if (response.statusCode == 200) {
+          // Reload profile to get new QR URL
+          await Provider.of<DriverProvider>(context, listen: false)
+              .getProfile();
+          setState(() {
+            _qrCodeFile = null; // Clear local file, show server image
+          });
+          ScaffoldMessenger.of(context).showSnackBar(
+            const SnackBar(
+              content: Text('QR Code updated successfully! ✅'),
+              backgroundColor: Colors.green,
+            ),
+          );
+        } else {
+          ScaffoldMessenger.of(context).showSnackBar(
+            const SnackBar(
+              content: Text('QR Code upload failed!'),
+              backgroundColor: Colors.red,
+            ),
+          );
+        }
+      }
+    } catch (e) {
+      print('QR upload error: $e');
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          const SnackBar(
+            content: Text('QR Code upload error!'),
+            backgroundColor: Colors.red,
+          ),
+        );
+      }
+    }
+
+    if (mounted) setState(() => _isUploadingQR = false);
+  }
+
+  Future<void> _saveDetails() async {
+    if (_formKey.currentState!.validate()) {
+      setState(() => _isLoading = true);
+
+      final driverProvider =
+          Provider.of<DriverProvider>(context, listen: false);
+
+      final success = await driverProvider.updateBankDetails(
+        bankName:            _bankNameController.text,
+        accountHolderName:   _accountHolderController.text,
+        accountNumber:       _accountNumberController.text,
+        mobilePaymentNumber: _mobileNumberController.text,
+      );
+
+      // Upload QR code if a new one was selected
+      if (_qrCodeFile != null && success) {
+        await _uploadQRCode();
+      }
+
+      setState(() => _isLoading = false);
+
+      if (mounted) {
+        if (success) {
+          ScaffoldMessenger.of(context).showSnackBar(
+            const SnackBar(
+              content: Text('Payment details saved successfully! ✅'),
+              backgroundColor: Colors.green,
+            ),
+          );
+          Navigator.pop(context);
+        } else {
+          ScaffoldMessenger.of(context).showSnackBar(
+            SnackBar(
+              content: Text(
+                  driverProvider.errorMessage ?? 'Update failed!'),
+              backgroundColor: Colors.red,
+            ),
+          );
+        }
+      }
+    }
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    final driverProvider = Provider.of<DriverProvider>(context);
+    final existingQR =
+        driverProvider.driverProfile?['qr_code_image'];
+
+    return Scaffold(
+      appBar: AppBar(
+        title: const Text('Payment Details'),
+      ),
+      body: driverProvider.isLoading
+          ? const Center(child: CircularProgressIndicator())
+          : SingleChildScrollView(
+              padding: const EdgeInsets.all(16),
+              child: Form(
+                key: _formKey,
+                child: Column(
+                  crossAxisAlignment:
+                      CrossAxisAlignment.stretch,
+                  children: [
+                    // ── INFO BANNER ──
+                    Container(
+                      padding: const EdgeInsets.all(12),
+                      decoration: BoxDecoration(
+                        color: Colors.blue.shade50,
+                        borderRadius:
+                            BorderRadius.circular(8),
+                        border: Border.all(
+                            color: Colors.blue.shade200),
+                      ),
+                      child: Row(children: [
+                        Icon(Icons.info,
+                            color: Colors.blue.shade700),
+                        const SizedBox(width: 8),
+                        const Expanded(
+                          child: Text(
+                            'These details will be shown to passengers when they pay online.',
+                            style: TextStyle(fontSize: 13),
+                          ),
+                        ),
+                      ]),
+                    ),
+                    const SizedBox(height: 24),
+
+                    // ── BANK DETAILS ──
+                    const Text('Bank Details',
+                        style: TextStyle(
+                            fontSize: 16,
+                            fontWeight: FontWeight.bold)),
+                    const SizedBox(height: 12),
+
+                    TextFormField(
+                      controller: _bankNameController,
+                      decoration: const InputDecoration(
+                        labelText: 'Bank Name',
+                        border: OutlineInputBorder(),
+                        prefixIcon:
+                            Icon(Icons.account_balance),
+                      ),
+                    ),
+                    const SizedBox(height: 12),
+
+                    TextFormField(
+                      controller: _accountHolderController,
+                      decoration: const InputDecoration(
+                        labelText: 'Account Holder Name',
+                        border: OutlineInputBorder(),
+                        prefixIcon: Icon(Icons.person),
+                      ),
+                    ),
+                    const SizedBox(height: 12),
+
+                    TextFormField(
+                      controller: _accountNumberController,
+                      decoration: const InputDecoration(
+                        labelText: 'Account Number',
+                        border: OutlineInputBorder(),
+                        prefixIcon: Icon(Icons.numbers),
+                      ),
+                      keyboardType: TextInputType.number,
+                    ),
+                    const SizedBox(height: 24),
+
+                    // ── MOBILE PAYMENT ──
+                    const Text('Mobile Payment',
+                        style: TextStyle(
+                            fontSize: 16,
+                            fontWeight: FontWeight.bold)),
+                    const SizedBox(height: 12),
+
+                    TextFormField(
+                      controller: _mobileNumberController,
+                      decoration: const InputDecoration(
+                        labelText: 'Mobile Payment Number',
+                        border: OutlineInputBorder(),
+                        prefixIcon: Icon(Icons.phone),
+                      ),
+                      keyboardType: TextInputType.phone,
+                    ),
+                    const SizedBox(height: 24),
+
+                    // ── QR CODE SECTION ──
+                    Row(
+                      mainAxisAlignment:
+                          MainAxisAlignment.spaceBetween,
+                      children: [
+                        const Text('QR Code',
+                            style: TextStyle(
+                                fontSize: 16,
+                                fontWeight: FontWeight.bold)),
+                        if (existingQR != null)
+                          TextButton.icon(
+                            onPressed: _pickQRCode,
+                            icon: const Icon(Icons.edit,
+                                size: 16),
+                            label: const Text('Update QR'),
+                          ),
+                      ],
+                    ),
+                    const SizedBox(height: 12),
+
+                    // QR Code Display
+                    GestureDetector(
+                      onTap: _pickQRCode,
+                      child: Container(
+                        height: 180,
+                        decoration: BoxDecoration(
+                          border: Border.all(
+                              color: Colors.grey.shade300),
+                          borderRadius:
+                              BorderRadius.circular(12),
+                          color: Colors.grey.shade50,
+                        ),
+                        child: _qrCodeFile != null
+                            // New file selected — show preview
+                            ? Stack(
+                                children: [
+                                  ClipRRect(
+                                    borderRadius:
+                                        BorderRadius.circular(
+                                            12),
+                                    child: Image.file(
+                                      _qrCodeFile!,
+                                      width: double.infinity,
+                                      height: 180,
+                                      fit: BoxFit.contain,
+                                    ),
+                                  ),
+                                  Positioned(
+                                    top: 8,
+                                    right: 8,
+                                    child: Container(
+                                      padding:
+                                          const EdgeInsets
+                                              .symmetric(
+                                              horizontal: 8,
+                                              vertical: 4),
+                                      decoration:
+                                          BoxDecoration(
+                                        color: Colors.orange,
+                                        borderRadius:
+                                            BorderRadius
+                                                .circular(8),
+                                      ),
+                                      child: const Text(
+                                        'New — Not saved yet',
+                                        style: TextStyle(
+                                            color:
+                                                Colors.white,
+                                            fontSize: 11),
+                                      ),
+                                    ),
+                                  ),
+                                ],
+                              )
+                            : existingQR != null
+                                // Existing QR from server
+                                ? Stack(
+                                    children: [
+                                      ClipRRect(
+                                        borderRadius:
+                                            BorderRadius
+                                                .circular(12),
+                                        child: Image.network(
+                                          existingQR,
+                                          width:
+                                              double.infinity,
+                                          height: 180,
+                                          fit: BoxFit.contain,
+                                          errorBuilder: (c, e,
+                                                  s) =>
+                                              const Icon(
+                                                  Icons.qr_code,
+                                                  size: 80,
+                                                  color: Colors
+                                                      .grey),
+                                        ),
+                                      ),
+                                      Positioned(
+                                        top: 8,
+                                        right: 8,
+                                        child: Container(
+                                          padding:
+                                              const EdgeInsets
+                                                  .symmetric(
+                                                  horizontal: 8,
+                                                  vertical: 4),
+                                          decoration:
+                                              BoxDecoration(
+                                            color: Colors.green,
+                                            borderRadius:
+                                                BorderRadius
+                                                    .circular(8),
+                                          ),
+                                          child: const Text(
+                                            'Saved ✅',
+                                            style: TextStyle(
+                                                color: Colors
+                                                    .white,
+                                                fontSize: 11),
+                                          ),
+                                        ),
+                                      ),
+                                    ],
+                                  )
+                                // No QR yet
+                                : const Column(
+                                    mainAxisAlignment:
+                                        MainAxisAlignment
+                                            .center,
+                                    children: [
+                                      Icon(Icons.qr_code,
+                                          size: 56,
+                                          color: Colors.grey),
+                                      SizedBox(height: 8),
+                                      Text(
+                                        'Tap to upload QR code',
+                                        style: TextStyle(
+                                            color: Colors.grey),
+                                      ),
+                                      SizedBox(height: 4),
+                                      Text(
+                                        'Passengers will scan this to pay',
+                                        style: TextStyle(
+                                            color: Colors.grey,
+                                            fontSize: 12),
+                                      ),
+                                    ],
+                                  ),
+                      ),
+                    ),
+
+                    // ✅ Upload QR button (shows only when new file selected)
+                    if (_qrCodeFile != null) ...[
+                      const SizedBox(height: 12),
+                      SizedBox(
+                        height: 45,
+                        child: _isUploadingQR
+                            ? const Center(
+                                child:
+                                    CircularProgressIndicator())
+                            : ElevatedButton.icon(
+                                onPressed: _uploadQRCode,
+                                icon: const Icon(
+                                    Icons.upload),
+                                label: const Text(
+                                    'Upload QR Code Now'),
+                                style:
+                                    ElevatedButton.styleFrom(
+                                  backgroundColor:
+                                      Colors.orange,
+                                  foregroundColor:
+                                      Colors.white,
+                                ),
+                              ),
+                      ),
+                    ],
+
+                    const SizedBox(height: 32),
+
+                    // ── SAVE BUTTON ──
+                    SizedBox(
+                      height: 50,
+                      child: _isLoading
+                          ? const Center(
+                              child:
+                                  CircularProgressIndicator())
+                          : ElevatedButton.icon(
+                              onPressed: _saveDetails,
+                              icon: const Icon(Icons.save),
+                              label: const Text(
+                                'Save Payment Details',
+                                style:
+                                    TextStyle(fontSize: 16),
+                              ),
+                              style: ElevatedButton.styleFrom(
+                                backgroundColor: Colors.teal,
+                                foregroundColor: Colors.white,
+                              ),
+                            ),
+                    ),
+                  ],
+                ),
+              ),
+            ),
+    );
+  }
+}
