@@ -484,8 +484,12 @@ class _MyBookingsScreenState extends State<MyBookingsScreen>
         final newStatus = bookingData['status'] ?? '';
         if (newStatus.isNotEmpty &&
             _firebaseStatuses[booking.id] != newStatus) {
+          // ✅ KEY FIX: Only show snackbar if status changed, not on first load
+          final isFirstLoad = _firebaseStatuses[booking.id] == null;
           setState(() => _firebaseStatuses[booking.id] = newStatus);
-          _showStatusChangeNotification(newStatus);
+          if (!isFirstLoad) {
+            _showStatusChangeNotification(newStatus);
+          }
           if (_shouldShowDriver(booking, newStatus) &&
               booking.driverFirebaseId != null &&
               _isToday(booking.createdAt)) {
@@ -811,8 +815,6 @@ class _MyBookingsScreenState extends State<MyBookingsScreen>
 
     return Scaffold(
       backgroundColor: const Color(0xFFF4F4F6),
-
-      // ── APP BAR ────────────────────────────────────────────
       appBar: AppBar(
         backgroundColor: Colors.white,
         elevation: 0,
@@ -841,7 +843,6 @@ class _MyBookingsScreenState extends State<MyBookingsScreen>
           ],
         ),
         actions: [
-          // Live indicator
           Row(children: [
             Container(
               width: 7, height: 7,
@@ -856,7 +857,6 @@ class _MyBookingsScreenState extends State<MyBookingsScreen>
                     fontWeight: FontWeight.w600)),
             const SizedBox(width: 8),
           ]),
-          // Refresh
           InkWell(
             onTap: () => bookingProvider
                 .getPassengerBookings()
@@ -868,7 +868,6 @@ class _MyBookingsScreenState extends State<MyBookingsScreen>
                   color: Colors.grey[600], size: 20),
             ),
           ),
-          // Logout
           Padding(
             padding: const EdgeInsets.only(right: 12, left: 4),
             child: InkWell(
@@ -902,7 +901,6 @@ class _MyBookingsScreenState extends State<MyBookingsScreen>
             ),
           ),
         ],
-        // ── TAB BAR ─────────────────────────────────────────
         bottom: PreferredSize(
           preferredSize: const Size.fromHeight(52),
           child: Container(
@@ -969,8 +967,6 @@ class _MyBookingsScreenState extends State<MyBookingsScreen>
           ),
         ),
       ),
-
-      // ── BOTTOM NAVIGATION BAR ──────────────────────────────
       bottomNavigationBar: Container(
         decoration: BoxDecoration(
           color: Colors.white,
@@ -1014,8 +1010,6 @@ class _MyBookingsScreenState extends State<MyBookingsScreen>
           ],
         ),
       ),
-
-      // ── BODY ───────────────────────────────────────────────
       body: bookingProvider.isLoading
           ? Center(
               child: CircularProgressIndicator(
@@ -1025,8 +1019,6 @@ class _MyBookingsScreenState extends State<MyBookingsScreen>
             )
           : Column(
               children: [
-
-                // ── MAP ───────────────────────────────────────
                 ClipRRect(
                   borderRadius: const BorderRadius.only(
                     bottomLeft: Radius.circular(16),
@@ -1075,8 +1067,6 @@ class _MyBookingsScreenState extends State<MyBookingsScreen>
                           ),
                   ),
                 ),
-
-                // ── MAP LEGEND ────────────────────────────────
                 Container(
                   color: Colors.white,
                   padding: const EdgeInsets.symmetric(
@@ -1114,8 +1104,6 @@ class _MyBookingsScreenState extends State<MyBookingsScreen>
                     ],
                   ]),
                 ),
-
-                // ── TAB VIEW ─────────────────────────────────
                 Expanded(
                   child: TabBarView(
                     controller: _tabController,
@@ -1213,12 +1201,9 @@ class _MyBookingsScreenState extends State<MyBookingsScreen>
         child: Column(
           crossAxisAlignment: CrossAxisAlignment.start,
           children: [
-
-            // ── Header row ──────────────────────────────────
             Row(
               mainAxisAlignment: MainAxisAlignment.spaceBetween,
               children: [
-                // Status badge
                 Container(
                   padding: const EdgeInsets.symmetric(
                       horizontal: 12, vertical: 6),
@@ -1251,10 +1236,7 @@ class _MyBookingsScreenState extends State<MyBookingsScreen>
                 ),
               ],
             ),
-
             const SizedBox(height: 14),
-
-            // ── Scheduled info ───────────────────────────────
             if (isScheduled &&
                 booking.scheduledDate != null &&
                 booking.scheduledTime != null) ...[
@@ -1288,8 +1270,6 @@ class _MyBookingsScreenState extends State<MyBookingsScreen>
                 ]),
               ),
             ],
-
-            // ── Status banners ───────────────────────────────
             if (isCancelled)
               _buildInfoBanner(
                   color: const Color(0xFFB71C1C),
@@ -1299,14 +1279,12 @@ class _MyBookingsScreenState extends State<MyBookingsScreen>
               _buildInfoBanner(
                   color: const Color(0xFF1565C0),
                   icon: Icons.check_circle_rounded,
-                  message:
-                      'Driver accepted! They are on their way.'),
+                  message: 'Driver accepted! They are on their way.'),
             if (isAccepted && isScheduled)
               _buildInfoBanner(
                   color: const Color(0xFF1565C0),
                   icon: Icons.check_circle_rounded,
-                  message:
-                      'Driver accepted! They will arrive at the scheduled time.'),
+                  message: 'Driver accepted! They will arrive at the scheduled time.'),
             if (isInProgress)
               _buildInfoBanner(
                   color: const Color(0xFF6A1B9A),
@@ -1317,8 +1295,6 @@ class _MyBookingsScreenState extends State<MyBookingsScreen>
                   color: const Color(0xFF2E7D32),
                   icon: Icons.done_all_rounded,
                   message: 'Ride completed! Thank you.'),
-
-            // ── Route ────────────────────────────────────────
             Row(children: [
               Container(
                 width: 8, height: 8,
@@ -1359,14 +1335,10 @@ class _MyBookingsScreenState extends State<MyBookingsScreen>
                 ),
               ),
             ]),
-
             const SizedBox(height: 14),
-
-            // ── Footer row ───────────────────────────────────
             Row(
               mainAxisAlignment: MainAxisAlignment.spaceBetween,
               children: [
-                // Vehicle type
                 Container(
                   padding: const EdgeInsets.symmetric(
                       horizontal: 10, vertical: 5),
@@ -1387,7 +1359,6 @@ class _MyBookingsScreenState extends State<MyBookingsScreen>
                     ),
                   ]),
                 ),
-                // Price
                 Text(
                   'Nu. ${booking.finalPrice ?? booking.estimatedPrice}',
                   style: TextStyle(
@@ -1398,15 +1369,11 @@ class _MyBookingsScreenState extends State<MyBookingsScreen>
                 ),
               ],
             ),
-
             const SizedBox(height: 8),
-
             Text(
               'Booked: ${_formatDate(booking.createdAt)}',
               style: TextStyle(fontSize: 11, color: Colors.grey[400]),
             ),
-
-            // ── Cancel button ────────────────────────────────
             if (isPending) ...[
               const SizedBox(height: 14),
               SizedBox(
@@ -1426,8 +1393,6 @@ class _MyBookingsScreenState extends State<MyBookingsScreen>
                 ),
               ),
             ],
-
-            // ── Cancelled actions ────────────────────────────
             if (isCancelled) ...[
               const SizedBox(height: 14),
               SizedBox(
@@ -1465,8 +1430,6 @@ class _MyBookingsScreenState extends State<MyBookingsScreen>
                 ),
               ),
             ],
-
-            // ── Completed remove ─────────────────────────────
             if (isCompleted) ...[
               const SizedBox(height: 14),
               SizedBox(

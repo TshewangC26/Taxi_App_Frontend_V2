@@ -55,11 +55,86 @@ class _ForgotPasswordScreenState extends State<ForgotPasswordScreen>
     super.dispose();
   }
 
+  // ── Email not found dialog ────────────────────────────────────
+  void _showEmailNotFoundDialog() {
+    showDialog(
+      context: context,
+      barrierColor: Colors.black.withOpacity(0.5),
+      builder: (ctx) => Dialog(
+        backgroundColor: Colors.transparent,
+        elevation: 0,
+        child: Container(
+          padding: const EdgeInsets.all(28),
+          decoration: BoxDecoration(
+              color: Colors.white,
+              borderRadius: BorderRadius.circular(24)),
+          child: Column(
+            mainAxisSize: MainAxisSize.min,
+            children: [
+              // Icon
+              Stack(alignment: Alignment.center, children: [
+                Container(
+                    width: 80, height: 80,
+                    decoration: BoxDecoration(
+                        color: Colors.red[50], shape: BoxShape.circle)),
+                Container(
+                    width: 62, height: 62,
+                    decoration: BoxDecoration(
+                        color: Colors.red[100], shape: BoxShape.circle)),
+                Container(
+                  width: 46, height: 46,
+                  decoration: BoxDecoration(
+                      color: Colors.red[400], shape: BoxShape.circle),
+                  child: const Icon(Icons.email_outlined,
+                      color: Colors.white, size: 22),
+                ),
+              ]),
+              const SizedBox(height: 20),
+              const Text('Email Not Found',
+                  style: TextStyle(
+                      fontSize: 20,
+                      fontWeight: FontWeight.w800,
+                      color: Colors.black87)),
+              const SizedBox(height: 10),
+              Text(
+                'No registered account was found\nwith this email address.\n\nPlease check your email and try again.',
+                textAlign: TextAlign.center,
+                style: TextStyle(
+                    fontSize: 14,
+                    color: Colors.grey[500],
+                    height: 1.6),
+              ),
+              const SizedBox(height: 28),
+              SizedBox(
+                width: double.infinity,
+                height: 50,
+                child: ElevatedButton(
+                  onPressed: () => Navigator.pop(ctx),
+                  style: ElevatedButton.styleFrom(
+                    backgroundColor: Colors.yellow[800],
+                    foregroundColor: Colors.white,
+                    elevation: 0,
+                    shape: RoundedRectangleBorder(
+                        borderRadius: BorderRadius.circular(14)),
+                  ),
+                  child: const Text('Try Again',
+                      style: TextStyle(
+                          fontSize: 15, fontWeight: FontWeight.w600)),
+                ),
+              ),
+            ],
+          ),
+        ),
+      ),
+    );
+  }
+
   Future<void> _sendResetCode() async {
     if (_formKey.currentState!.validate()) {
       setState(() => _isLoading = true);
 
-      final authProvider = Provider.of<AuthProvider>(context, listen: false);
+      final authProvider =
+          Provider.of<AuthProvider>(context, listen: false);
 
       final success = await authProvider.forgotPassword(
         email: _emailController.text.trim(),
@@ -80,17 +155,13 @@ class _ForgotPasswordScreenState extends State<ForgotPasswordScreen>
             MaterialPageRoute(
               builder: (context) => ResetPasswordScreen(
                 email: _emailController.text.trim(),
+                userName: authProvider.resetUserName,
               ),
             ),
           );
         } else {
-          ScaffoldMessenger.of(context).showSnackBar(
-            SnackBar(
-              content: Text(
-                  authProvider.errorMessage ?? 'Failed to send reset code!'),
-              backgroundColor: Colors.grey[800],
-            ),
-          );
+          // Show styled dialog for unregistered email
+          _showEmailNotFoundDialog();
         }
       }
     }
@@ -150,8 +221,7 @@ class _ForgotPasswordScreenState extends State<ForgotPasswordScreen>
                         ScaleTransition(
                           scale: _iconScaleAnim,
                           child: Container(
-                            width: 80,
-                            height: 80,
+                            width: 80, height: 80,
                             decoration: BoxDecoration(
                               color: Colors.white.withOpacity(0.2),
                               shape: BoxShape.circle,
@@ -222,12 +292,12 @@ class _ForgotPasswordScreenState extends State<ForgotPasswordScreen>
                   TextFormField(
                     controller: _emailController,
                     keyboardType: TextInputType.emailAddress,
-                    style:
-                        const TextStyle(color: Colors.black87, fontSize: 15),
+                    style: const TextStyle(
+                        color: Colors.black87, fontSize: 15),
                     decoration: InputDecoration(
                       labelText: 'Email Address',
-                      labelStyle:
-                          TextStyle(color: Colors.grey[600], fontSize: 14),
+                      labelStyle: TextStyle(
+                          color: Colors.grey[600], fontSize: 14),
                       prefixIcon: Icon(Icons.email_outlined,
                           color: Colors.yellow[800], size: 20),
                       filled: true,
@@ -236,16 +306,18 @@ class _ForgotPasswordScreenState extends State<ForgotPasswordScreen>
                           horizontal: 16, vertical: 16),
                       border: OutlineInputBorder(
                         borderRadius: BorderRadius.circular(14),
-                        borderSide: BorderSide(color: Colors.yellow[200]!),
+                        borderSide:
+                            BorderSide(color: Colors.yellow[200]!),
                       ),
                       enabledBorder: OutlineInputBorder(
                         borderRadius: BorderRadius.circular(14),
-                        borderSide: BorderSide(color: Colors.yellow[200]!),
+                        borderSide:
+                            BorderSide(color: Colors.yellow[200]!),
                       ),
                       focusedBorder: OutlineInputBorder(
                         borderRadius: BorderRadius.circular(14),
-                        borderSide:
-                            BorderSide(color: Colors.yellow[800]!, width: 2),
+                        borderSide: BorderSide(
+                            color: Colors.yellow[800]!, width: 2),
                       ),
                       errorBorder: OutlineInputBorder(
                         borderRadius: BorderRadius.circular(14),
@@ -317,7 +389,8 @@ class _ForgotPasswordScreenState extends State<ForgotPasswordScreen>
                           ),
                           child: ElevatedButton.icon(
                             onPressed: _sendResetCode,
-                            icon: const Icon(Icons.send_rounded, size: 20),
+                            icon: const Icon(Icons.send_rounded,
+                                size: 20),
                             label: const Text(
                               'Send Reset Code',
                               style: TextStyle(

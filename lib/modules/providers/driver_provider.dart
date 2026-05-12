@@ -3,6 +3,7 @@ import 'dart:io';
 import 'package:flutter/foundation.dart';
 import 'package:flutter/material.dart';
 import 'package:geolocator/geolocator.dart';
+import 'package:location/location.dart' as location_pkg;
 import '../services/api_service.dart';
 import '../services/firebase_services.dart';
 
@@ -91,9 +92,7 @@ class DriverProvider with ChangeNotifier {
       dynamic response;
 
       if (qrImagePath != null) {
-        // Check file exists on non-web platforms
-        final shouldUpload =
-            kIsWeb || await File(qrImagePath).exists();
+        final shouldUpload = kIsWeb || await File(qrImagePath).exists();
 
         if (shouldUpload) {
           response = await _apiService.postMultipart(
@@ -103,16 +102,16 @@ class DriverProvider with ChangeNotifier {
             filePath:  qrImagePath,
           );
         } else {
-          // File not found — fall back to plain POST
           response = await _apiService.postMultipart(
             '/driver/profile/update',
-            fields: fields,);
+            fields: fields,
+          );
         }
       } else {
-        // No QR image — plain POST
         response = await _apiService.postMultipart(
-            '/driver/profile/update',
-           fields: fields,);
+          '/driver/profile/update',
+          fields: fields,
+        );
       }
 
       if (response['success'] == true ||
@@ -165,12 +164,10 @@ class DriverProvider with ChangeNotifier {
 
   // ── GPS location tracking ─────────────────────────────────────
   Future<bool> requestLocationPermission() async {
-    bool serviceEnabled =
-        await Geolocator.isLocationServiceEnabled();
+    bool serviceEnabled = await Geolocator.isLocationServiceEnabled();
     if (!serviceEnabled) return false;
 
-    LocationPermission permission =
-        await Geolocator.checkPermission();
+    LocationPermission permission = await Geolocator.checkPermission();
     if (permission == LocationPermission.denied) {
       permission = await Geolocator.requestPermission();
       if (permission == LocationPermission.denied) return false;
@@ -189,8 +186,7 @@ class DriverProvider with ChangeNotifier {
     await _sendLocationToFirebase();
 
     _locationTimer?.cancel();
-    _locationTimer =
-        Timer.periodic(const Duration(seconds: 15), (_) async {
+    _locationTimer = Timer.periodic(const Duration(seconds: 15), (_) async {
       await _sendLocationToFirebase();
     });
   }
@@ -204,22 +200,27 @@ class DriverProvider with ChangeNotifier {
     if (_driverProfile == null) return;
 
     try {
-      final position = await Geolocator.getCurrentPosition(
-        desiredAccuracy: LocationAccuracy.high,
+      final loc = location_pkg.Location();
+      await loc.changeSettings(
+        accuracy: location_pkg.LocationAccuracy.high,
+        interval: 1000,
+        distanceFilter: 0,
       );
 
-      _currentLat = position.latitude;
-      _currentLng = position.longitude;
+      final locationData = await loc.getLocation();
+
+      _currentLat = locationData.latitude;
+      _currentLng = locationData.longitude;
 
       final driverId    = _driverProfile?['id'];
       final driverName  = _driverProfile?['name'] ?? 'Unknown';
       final vehicleType = _driverProfile?['vehicle_type'] ?? '';
 
-      if (driverId != null) {
+      if (driverId != null && _currentLat != null && _currentLng != null) {
         await FirebaseService.updateDriverLocation(
           driverId:    driverId,
-          latitude:    position.latitude,
-          longitude:   position.longitude,
+          latitude:    _currentLat!,
+          longitude:   _currentLng!,
           status:      _driverStatus,
           vehicleType: vehicleType,
           driverName:  driverName,
@@ -227,8 +228,8 @@ class DriverProvider with ChangeNotifier {
 
         try {
           await _apiService.post('/driver/update-location', {
-            'latitude':  position.latitude,
-            'longitude': position.longitude,
+            'latitude':  _currentLat,
+            'longitude': _currentLng,
           });
         } catch (_) {}
       }

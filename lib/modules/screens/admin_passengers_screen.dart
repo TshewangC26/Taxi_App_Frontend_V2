@@ -23,7 +23,12 @@ class _AdminPassengersScreenState
   final int _currentIndex = 3;
 
   List<dynamic> _passengers = [];
+  List<dynamic> _filteredPassengers = [];
   bool _isLoading = true;
+
+  final TextEditingController _searchController =
+      TextEditingController();
+  String _searchQuery = '';
 
   late AnimationController _animController;
   late Animation<double> _fadeAnim;
@@ -39,11 +44,24 @@ class _AdminPassengersScreenState
         CurvedAnimation(parent: _animController, curve: Curves.easeOut);
     _animController.forward();
     _loadPassengers();
+
+    _searchController.addListener(() {
+      setState(() {
+        _searchQuery = _searchController.text.toLowerCase();
+        _filteredPassengers = _passengers
+            .where((p) => (p['name'] ?? '')
+                .toString()
+                .toLowerCase()
+                .contains(_searchQuery))
+            .toList();
+      });
+    });
   }
 
   @override
   void dispose() {
     _animController.dispose();
+    _searchController.dispose();
     super.dispose();
   }
 
@@ -56,8 +74,8 @@ class _AdminPassengersScreenState
         Navigator.pushAndRemoveUntil(
           context,
           PageRouteBuilder(
-            pageBuilder: (_, a, __) =>
-                FadeTransition(opacity: a, child: const AdminHomeScreen()),
+            pageBuilder: (_, a, __) => FadeTransition(
+                opacity: a, child: const AdminHomeScreen()),
             transitionDuration: const Duration(milliseconds: 300),
           ),
           (r) => false,
@@ -104,20 +122,17 @@ class _AdminPassengersScreenState
             children: [
               Stack(alignment: Alignment.center, children: [
                 Container(
-                    width: 80,
-                    height: 80,
+                    width: 80, height: 80,
                     decoration: BoxDecoration(
                         color: Colors.yellow[50],
                         shape: BoxShape.circle)),
                 Container(
-                    width: 62,
-                    height: 62,
+                    width: 62, height: 62,
                     decoration: BoxDecoration(
                         color: Colors.yellow[100],
                         shape: BoxShape.circle)),
                 Container(
-                  width: 46,
-                  height: 46,
+                  width: 46, height: 46,
                   decoration: BoxDecoration(
                       color: Colors.yellow[800],
                       shape: BoxShape.circle),
@@ -144,7 +159,8 @@ class _AdminPassengersScreenState
                   child: OutlinedButton(
                     onPressed: () => Navigator.of(ctx).pop(false),
                     style: OutlinedButton.styleFrom(
-                      padding: const EdgeInsets.symmetric(vertical: 14),
+                      padding:
+                          const EdgeInsets.symmetric(vertical: 14),
                       side: BorderSide(color: Colors.grey.shade300),
                       shape: RoundedRectangleBorder(
                           borderRadius: BorderRadius.circular(14)),
@@ -164,7 +180,8 @@ class _AdminPassengersScreenState
                       backgroundColor: Colors.yellow[800],
                       foregroundColor: Colors.white,
                       elevation: 0,
-                      padding: const EdgeInsets.symmetric(vertical: 14),
+                      padding:
+                          const EdgeInsets.symmetric(vertical: 14),
                       shape: RoundedRectangleBorder(
                           borderRadius: BorderRadius.circular(14)),
                     ),
@@ -205,6 +222,14 @@ class _AdminPassengersScreenState
       final response = await _apiService.get('/admin/passengers');
       setState(() {
         _passengers = response['passengers'] ?? [];
+        _filteredPassengers = _searchQuery.isEmpty
+            ? List.from(_passengers)
+            : _passengers
+                .where((p) => (p['name'] ?? '')
+                    .toString()
+                    .toLowerCase()
+                    .contains(_searchQuery))
+                .toList();
         _isLoading = false;
       });
     } catch (e) {
@@ -238,10 +263,8 @@ class _AdminPassengersScreenState
             child: Column(
               mainAxisSize: MainAxisSize.min,
               children: [
-                // Icon
                 Container(
-                  width: 52,
-                  height: 52,
+                  width: 52, height: 52,
                   decoration: BoxDecoration(
                       color: Colors.yellow[50],
                       shape: BoxShape.circle),
@@ -262,7 +285,6 @@ class _AdminPassengersScreenState
                 ),
                 const SizedBox(height: 20),
 
-                // Full Name
                 _dialogField(
                   controller: nameCtrl,
                   label: 'Full Name',
@@ -272,7 +294,6 @@ class _AdminPassengersScreenState
                 ),
                 const SizedBox(height: 12),
 
-                // Email (add-only)
                 if (!isEdit) ...[
                   _dialogField(
                     controller: emailCtrl,
@@ -283,8 +304,6 @@ class _AdminPassengersScreenState
                     keyboardType: TextInputType.emailAddress,
                   ),
                   const SizedBox(height: 12),
-
-                  // Password (add-only)
                   _dialogField(
                     controller: passwordCtrl,
                     label: 'Password',
@@ -295,7 +314,6 @@ class _AdminPassengersScreenState
                   const SizedBox(height: 12),
                 ],
 
-                // Phone
                 _dialogField(
                   controller: phoneCtrl,
                   label: 'Phone Number',
@@ -307,7 +325,6 @@ class _AdminPassengersScreenState
 
                 const SizedBox(height: 24),
 
-                // Buttons
                 Row(children: [
                   Expanded(
                     child: OutlinedButton(
@@ -315,7 +332,8 @@ class _AdminPassengersScreenState
                       style: OutlinedButton.styleFrom(
                         padding:
                             const EdgeInsets.symmetric(vertical: 13),
-                        side: BorderSide(color: Colors.grey.shade300),
+                        side:
+                            BorderSide(color: Colors.grey.shade300),
                         shape: RoundedRectangleBorder(
                             borderRadius: BorderRadius.circular(12)),
                         foregroundColor: Colors.black54,
@@ -337,8 +355,8 @@ class _AdminPassengersScreenState
                                     passwordCtrl.text.isEmpty))) {
                           ScaffoldMessenger.of(context)
                               .showSnackBar(SnackBar(
-                            content:
-                                const Text('Please fill all fields'),
+                            content: const Text(
+                                'Please fill all fields'),
                             backgroundColor: Colors.grey[800],
                           ));
                           return;
@@ -423,8 +441,7 @@ class _AdminPassengersScreenState
             mainAxisSize: MainAxisSize.min,
             children: [
               Container(
-                width: 56,
-                height: 56,
+                width: 56, height: 56,
                 decoration: BoxDecoration(
                     color: Colors.red[50], shape: BoxShape.circle),
                 child: Icon(Icons.delete_outline_rounded,
@@ -453,7 +470,8 @@ class _AdminPassengersScreenState
                     style: OutlinedButton.styleFrom(
                       padding:
                           const EdgeInsets.symmetric(vertical: 13),
-                      side: BorderSide(color: Colors.grey.shade300),
+                      side:
+                          BorderSide(color: Colors.grey.shade300),
                       shape: RoundedRectangleBorder(
                           borderRadius: BorderRadius.circular(12)),
                       foregroundColor: Colors.black54,
@@ -695,61 +713,146 @@ class _AdminPassengersScreenState
       ),
 
       // ── BODY ─────────────────────────────────────────────
-      body: _isLoading
-          ? Center(
-              child: CircularProgressIndicator(
-                valueColor: AlwaysStoppedAnimation<Color>(
-                    Colors.yellow[800]!),
-              ),
-            )
-          : _passengers.isEmpty
-              ? FadeTransition(
-                  opacity: _fadeAnim,
-                  child: Center(
-                    child: Column(
-                      mainAxisAlignment:
-                          MainAxisAlignment.center,
-                      children: [
-                        Container(
-                          width: 80,
-                          height: 80,
-                          decoration: BoxDecoration(
-                              color: Colors.grey[100],
-                              shape: BoxShape.circle),
-                          child: Icon(Icons.people_rounded,
-                              size: 38,
-                              color: Colors.grey[300]),
-                        ),
-                        const SizedBox(height: 16),
-                        Text('No passengers yet',
-                            style: TextStyle(
-                                fontSize: 16,
-                                fontWeight: FontWeight.w600,
-                                color: Colors.grey[500])),
-                        const SizedBox(height: 6),
-                        Text('Tap + Add Passenger to create one',
-                            style: TextStyle(
-                                fontSize: 13,
-                                color: Colors.grey[400])),
-                      ],
-                    ),
-                  ),
-                )
-              : FadeTransition(
-                  opacity: _fadeAnim,
-                  child: RefreshIndicator(
-                    color: Colors.yellow[800],
-                    onRefresh: _loadPassengers,
-                    child: ListView.builder(
-                      padding: const EdgeInsets.fromLTRB(
-                          16, 16, 16, 100),
-                      itemCount: _passengers.length,
-                      itemBuilder: (context, index) =>
-                          _buildPassengerCard(
-                              _passengers[index]),
-                    ),
-                  ),
+      body: Column(
+        children: [
+          // ── SEARCH BAR ─────────────────────────────────
+          Container(
+            color: Colors.white,
+            padding: const EdgeInsets.fromLTRB(16, 10, 16, 12),
+            child: TextField(
+              controller: _searchController,
+              style: const TextStyle(
+                  fontSize: 14, color: Colors.black87),
+              decoration: InputDecoration(
+                hintText: 'Search passengers by name...',
+                hintStyle:
+                    TextStyle(color: Colors.grey[400], fontSize: 13),
+                prefixIcon: Icon(Icons.search_rounded,
+                    color: Colors.yellow[800], size: 20),
+                suffixIcon: _searchQuery.isNotEmpty
+                    ? IconButton(
+                        icon: Icon(Icons.close_rounded,
+                            color: Colors.grey[400], size: 18),
+                        onPressed: () => _searchController.clear(),
+                      )
+                    : null,
+                filled: true,
+                fillColor: Colors.grey[50],
+                contentPadding: const EdgeInsets.symmetric(
+                    horizontal: 16, vertical: 12),
+                border: OutlineInputBorder(
+                  borderRadius: BorderRadius.circular(12),
+                  borderSide: BorderSide(color: Colors.grey.shade200),
                 ),
+                enabledBorder: OutlineInputBorder(
+                  borderRadius: BorderRadius.circular(12),
+                  borderSide: BorderSide(color: Colors.grey.shade200),
+                ),
+                focusedBorder: OutlineInputBorder(
+                  borderRadius: BorderRadius.circular(12),
+                  borderSide:
+                      BorderSide(color: Colors.yellow[800]!, width: 2),
+                ),
+              ),
+            ),
+          ),
+
+          // ── LIST ───────────────────────────────────────
+          Expanded(
+            child: _isLoading
+                ? Center(
+                    child: CircularProgressIndicator(
+                      valueColor: AlwaysStoppedAnimation<Color>(
+                          Colors.yellow[800]!),
+                    ),
+                  )
+                : _passengers.isEmpty
+                    ? FadeTransition(
+                        opacity: _fadeAnim,
+                        child: Center(
+                          child: Column(
+                            mainAxisAlignment:
+                                MainAxisAlignment.center,
+                            children: [
+                              Container(
+                                width: 80, height: 80,
+                                decoration: BoxDecoration(
+                                    color: Colors.grey[100],
+                                    shape: BoxShape.circle),
+                                child: Icon(Icons.people_rounded,
+                                    size: 38,
+                                    color: Colors.grey[300]),
+                              ),
+                              const SizedBox(height: 16),
+                              Text('No passengers yet',
+                                  style: TextStyle(
+                                      fontSize: 16,
+                                      fontWeight: FontWeight.w600,
+                                      color: Colors.grey[500])),
+                              const SizedBox(height: 6),
+                              Text(
+                                  'Tap + Add Passenger to create one',
+                                  style: TextStyle(
+                                      fontSize: 13,
+                                      color: Colors.grey[400])),
+                            ],
+                          ),
+                        ),
+                      )
+                    : _filteredPassengers.isEmpty
+                        ? FadeTransition(
+                            opacity: _fadeAnim,
+                            child: Center(
+                              child: Column(
+                                mainAxisAlignment:
+                                    MainAxisAlignment.center,
+                                children: [
+                                  Container(
+                                    width: 80, height: 80,
+                                    decoration: BoxDecoration(
+                                        color: Colors.grey[100],
+                                        shape: BoxShape.circle),
+                                    child: Icon(
+                                        Icons.search_off_rounded,
+                                        size: 38,
+                                        color: Colors.grey[300]),
+                                  ),
+                                  const SizedBox(height: 16),
+                                  Text('No results found',
+                                      style: TextStyle(
+                                          fontSize: 16,
+                                          fontWeight: FontWeight.w600,
+                                          color: Colors.grey[500])),
+                                  const SizedBox(height: 6),
+                                  Text(
+                                    'No passenger named "${_searchController.text}"',
+                                    style: TextStyle(
+                                        fontSize: 13,
+                                        color: Colors.grey[400]),
+                                  ),
+                                ],
+                              ),
+                            ),
+                          )
+                        : FadeTransition(
+                            opacity: _fadeAnim,
+                            child: RefreshIndicator(
+                              color: Colors.yellow[800],
+                              onRefresh: _loadPassengers,
+                              child: ListView.builder(
+                                padding: const EdgeInsets.fromLTRB(
+                                    16, 16, 16, 100),
+                                itemCount:
+                                    _filteredPassengers.length,
+                                itemBuilder: (context, index) =>
+                                    _buildPassengerCard(
+                                        _filteredPassengers[index]),
+                              ),
+                            ),
+                          ),
+          ),
+        ],
+      ),
     );
   }
 
@@ -775,98 +878,87 @@ class _AdminPassengersScreenState
           children: [
 
             // ── Header ──────────────────────────────────
-            Row(
-              children: [
-                // Avatar
-                Container(
-                  width: 54,
-                  height: 54,
-                  decoration: BoxDecoration(
-                    shape: BoxShape.circle,
-                    color: Colors.yellow[50],
-                    border: Border.all(
-                        color: Colors.yellow[200]!, width: 1.5),
-                  ),
-                  child: profilePhoto != null
-                      ? ClipOval(
-                          child: Image.network(
-                            profilePhoto,
-                            fit: BoxFit.cover,
-                            errorBuilder: (_, __, ___) =>
-                                _avatarFallback(initials),
-                          ),
-                        )
-                      : _avatarFallback(initials),
+            Row(children: [
+              Container(
+                width: 54, height: 54,
+                decoration: BoxDecoration(
+                  shape: BoxShape.circle,
+                  color: Colors.yellow[50],
+                  border: Border.all(
+                      color: Colors.yellow[200]!, width: 1.5),
                 ),
-                const SizedBox(width: 14),
-
-                // Name + email
-                Expanded(
-                  child: Column(
-                    crossAxisAlignment:
-                        CrossAxisAlignment.start,
-                    children: [
-                      Text(name,
-                          style: const TextStyle(
-                              fontWeight: FontWeight.w700,
-                              fontSize: 15,
-                              color: Colors.black87),
-                          overflow: TextOverflow.ellipsis),
-                      const SizedBox(height: 3),
-                      Text(passenger['email'] ?? '',
-                          style: TextStyle(
-                              fontSize: 12,
-                              color: Colors.grey[500]),
-                          overflow: TextOverflow.ellipsis),
-                    ],
-                  ),
+                child: profilePhoto != null
+                    ? ClipOval(
+                        child: Image.network(
+                          profilePhoto,
+                          fit: BoxFit.cover,
+                          errorBuilder: (_, __, ___) =>
+                              _avatarFallback(initials),
+                        ),
+                      )
+                    : _avatarFallback(initials),
+              ),
+              const SizedBox(width: 14),
+              Expanded(
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    Text(name,
+                        style: const TextStyle(
+                            fontWeight: FontWeight.w700,
+                            fontSize: 15,
+                            color: Colors.black87),
+                        overflow: TextOverflow.ellipsis),
+                    const SizedBox(height: 3),
+                    Text(passenger['email'] ?? '',
+                        style: TextStyle(
+                            fontSize: 12,
+                            color: Colors.grey[500]),
+                        overflow: TextOverflow.ellipsis),
+                  ],
                 ),
-
-                // Rides badge
-                Container(
-                  padding: const EdgeInsets.symmetric(
-                      horizontal: 10, vertical: 5),
-                  decoration: BoxDecoration(
-                    color: const Color(0xFFE3F2FD),
-                    borderRadius: BorderRadius.circular(20),
-                    border: Border.all(
-                        color: const Color(0xFF90CAF9)),
-                  ),
-                  child: Text(
-                    '$totalRides rides',
-                    style: const TextStyle(
-                        color: Color(0xFF1565C0),
-                        fontSize: 11,
-                        fontWeight: FontWeight.w700),
-                  ),
+              ),
+              Container(
+                padding: const EdgeInsets.symmetric(
+                    horizontal: 10, vertical: 5),
+                decoration: BoxDecoration(
+                  color: const Color(0xFFE3F2FD),
+                  borderRadius: BorderRadius.circular(20),
+                  border:
+                      Border.all(color: const Color(0xFF90CAF9)),
                 ),
-              ],
-            ),
+                child: Text(
+                  '$totalRides rides',
+                  style: const TextStyle(
+                      color: Color(0xFF1565C0),
+                      fontSize: 11,
+                      fontWeight: FontWeight.w700),
+                ),
+              ),
+            ]),
 
             Divider(height: 20, color: Colors.grey.shade100),
 
             // ── Info row ─────────────────────────────────
-            Row(
-              children: [
-                Icon(Icons.phone_rounded,
-                    size: 14, color: Colors.grey[400]),
-                const SizedBox(width: 5),
-                Text(passenger['phone'] ?? 'N/A',
-                    style: TextStyle(
-                        fontSize: 13,
-                        color: Colors.grey[700],
-                        fontWeight: FontWeight.w500)),
-                const SizedBox(width: 18),
-                Icon(Icons.calendar_today_rounded,
-                    size: 13, color: Colors.grey[400]),
-                const SizedBox(width: 5),
-                Text(
-                  _formatDate(passenger['created_at'] ?? ''),
+            Row(children: [
+              Icon(Icons.phone_rounded,
+                  size: 14, color: Colors.grey[400]),
+              const SizedBox(width: 5),
+              Text(passenger['phone'] ?? 'N/A',
                   style: TextStyle(
-                      fontSize: 12, color: Colors.grey[500]),
-                ),
-              ],
-            ),
+                      fontSize: 13,
+                      color: Colors.grey[700],
+                      fontWeight: FontWeight.w500)),
+              const SizedBox(width: 18),
+              Icon(Icons.calendar_today_rounded,
+                  size: 13, color: Colors.grey[400]),
+              const SizedBox(width: 5),
+              Text(
+                _formatDate(passenger['created_at'] ?? ''),
+                style: TextStyle(
+                    fontSize: 12, color: Colors.grey[500]),
+              ),
+            ]),
 
             Divider(height: 20, color: Colors.grey.shade100),
 

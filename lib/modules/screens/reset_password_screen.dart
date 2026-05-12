@@ -1,10 +1,12 @@
 import 'package:flutter/material.dart';
 import 'package:provider/provider.dart';
 import '../providers/auth_provider.dart';
+import 'login_screens.dart';
 
 class ResetPasswordScreen extends StatefulWidget {
   final String email;
-  const ResetPasswordScreen({super.key, required this.email});
+  final String? userName;
+  const ResetPasswordScreen({super.key, required this.email, this.userName});
 
   @override
   State<ResetPasswordScreen> createState() => _ResetPasswordScreenState();
@@ -50,12 +52,19 @@ class _ResetPasswordScreenState extends State<ResetPasswordScreen> {
               backgroundColor: Colors.green,
             ),
           );
-          // Go back to login screen
-          Navigator.of(context).pushNamedAndRemoveUntil('/', (route) => false);
+          Navigator.of(context).pushAndRemoveUntil(
+            MaterialPageRoute(
+              builder: (context) => LoginScreen(
+                prefillName: widget.userName,
+              ),
+            ),
+            (route) => false,
+          );
         } else {
           ScaffoldMessenger.of(context).showSnackBar(
             SnackBar(
-              content: Text(authProvider.errorMessage ?? 'Failed to reset password!'),
+              content: Text(
+                  authProvider.errorMessage ?? 'Failed to reset password!'),
               backgroundColor: Colors.red,
             ),
           );
@@ -79,7 +88,6 @@ class _ResetPasswordScreenState extends State<ResetPasswordScreen> {
             children: [
               const SizedBox(height: 16),
 
-              // Info text
               Container(
                 padding: const EdgeInsets.all(16),
                 decoration: BoxDecoration(
@@ -102,7 +110,6 @@ class _ResetPasswordScreenState extends State<ResetPasswordScreen> {
               ),
               const SizedBox(height: 24),
 
-              // Reset Code Field
               TextFormField(
                 controller: _codeController,
                 keyboardType: TextInputType.number,
@@ -125,7 +132,6 @@ class _ResetPasswordScreenState extends State<ResetPasswordScreen> {
               ),
               const SizedBox(height: 16),
 
-              // New Password Field
               TextFormField(
                 controller: _newPasswordController,
                 obscureText: !_showNewPassword,
@@ -158,7 +164,6 @@ class _ResetPasswordScreenState extends State<ResetPasswordScreen> {
               ),
               const SizedBox(height: 16),
 
-              // Confirm Password Field
               TextFormField(
                 controller: _confirmPasswordController,
                 obscureText: !_showConfirmPassword,
@@ -191,7 +196,6 @@ class _ResetPasswordScreenState extends State<ResetPasswordScreen> {
               ),
               const SizedBox(height: 32),
 
-              // Reset Button
               SizedBox(
                 height: 50,
                 child: _isLoading

@@ -21,7 +21,11 @@ class _AdminDriversScreenState extends State<AdminDriversScreen>
   final int _currentIndex = 2;
 
   List<dynamic> _drivers = [];
+  List<dynamic> _filteredDrivers = [];
   bool _isLoading = true;
+
+  final TextEditingController _searchController = TextEditingController();
+  String _searchQuery = '';
 
   late AnimationController _animController;
   late Animation<double> _fadeAnim;
@@ -37,11 +41,24 @@ class _AdminDriversScreenState extends State<AdminDriversScreen>
         parent: _animController, curve: Curves.easeOut);
     _animController.forward();
     _loadDrivers();
+
+    _searchController.addListener(() {
+      setState(() {
+        _searchQuery = _searchController.text.toLowerCase();
+        _filteredDrivers = _drivers
+            .where((d) => (d['name'] ?? '')
+                .toString()
+                .toLowerCase()
+                .contains(_searchQuery))
+            .toList();
+      });
+    });
   }
 
   @override
   void dispose() {
     _animController.dispose();
+    _searchController.dispose();
     super.dispose();
   }
 
@@ -194,6 +211,14 @@ class _AdminDriversScreenState extends State<AdminDriversScreen>
       final response = await _apiService.get('/admin/drivers');
       setState(() {
         _drivers = response['drivers'] ?? [];
+        _filteredDrivers = _searchQuery.isEmpty
+            ? List.from(_drivers)
+            : _drivers
+                .where((d) => (d['name'] ?? '')
+                    .toString()
+                    .toLowerCase()
+                    .contains(_searchQuery))
+                .toList();
         _isLoading = false;
       });
     } catch (e) {
@@ -825,55 +850,139 @@ class _AdminDriversScreenState extends State<AdminDriversScreen>
       ),
 
       // ── BODY ─────────────────────────────────────────────
-      body: _isLoading
-          ? Center(
-              child: CircularProgressIndicator(
-                valueColor: AlwaysStoppedAnimation<Color>(
-                    Colors.yellow[800]!),
-              ),
-            )
-          : _drivers.isEmpty
-              ? FadeTransition(
-                  opacity: _fadeAnim,
-                  child: Center(
-                    child: Column(
-                      mainAxisAlignment: MainAxisAlignment.center,
-                      children: [
-                        Container(
-                          width: 80, height: 80,
-                          decoration: BoxDecoration(
-                              color: Colors.grey[100],
-                              shape: BoxShape.circle),
-                          child: Icon(Icons.drive_eta_rounded,
-                              size: 38, color: Colors.grey[300]),
-                        ),
-                        const SizedBox(height: 16),
-                        Text('No drivers yet',
-                            style: TextStyle(fontSize: 16,
-                                fontWeight: FontWeight.w600,
-                                color: Colors.grey[500])),
-                        const SizedBox(height: 6),
-                        Text('Tap + Add Driver to add one',
-                            style: TextStyle(
-                                fontSize: 13, color: Colors.grey[400])),
-                      ],
-                    ),
-                  ),
-                )
-              : FadeTransition(
-                  opacity: _fadeAnim,
-                  child: RefreshIndicator(
-                    color: Colors.yellow[800],
-                    onRefresh: _loadDrivers,
-                    child: ListView.builder(
-                      padding: const EdgeInsets.fromLTRB(
-                          16, 16, 16, 100),
-                      itemCount: _drivers.length,
-                      itemBuilder: (context, index) =>
-                          _buildDriverCard(_drivers[index]),
-                    ),
-                  ),
+      body: Column(
+        children: [
+          // ── SEARCH BAR ─────────────────────────────────
+          Container(
+            color: Colors.white,
+            padding: const EdgeInsets.fromLTRB(16, 10, 16, 12),
+            child: TextField(
+              controller: _searchController,
+              style: const TextStyle(fontSize: 14, color: Colors.black87),
+              decoration: InputDecoration(
+                hintText: 'Search drivers by name...',
+                hintStyle: TextStyle(color: Colors.grey[400], fontSize: 13),
+                prefixIcon: Icon(Icons.search_rounded,
+                    color: Colors.yellow[800], size: 20),
+                suffixIcon: _searchQuery.isNotEmpty
+                    ? IconButton(
+                        icon: Icon(Icons.close_rounded,
+                            color: Colors.grey[400], size: 18),
+                        onPressed: () {
+                          _searchController.clear();
+                        },
+                      )
+                    : null,
+                filled: true,
+                fillColor: Colors.grey[50],
+                contentPadding: const EdgeInsets.symmetric(
+                    horizontal: 16, vertical: 12),
+                border: OutlineInputBorder(
+                  borderRadius: BorderRadius.circular(12),
+                  borderSide: BorderSide(color: Colors.grey.shade200),
                 ),
+                enabledBorder: OutlineInputBorder(
+                  borderRadius: BorderRadius.circular(12),
+                  borderSide: BorderSide(color: Colors.grey.shade200),
+                ),
+                focusedBorder: OutlineInputBorder(
+                  borderRadius: BorderRadius.circular(12),
+                  borderSide:
+                      BorderSide(color: Colors.yellow[800]!, width: 2),
+                ),
+              ),
+            ),
+          ),
+
+          // ── LIST ───────────────────────────────────────
+          Expanded(
+            child: _isLoading
+                ? Center(
+                    child: CircularProgressIndicator(
+                      valueColor: AlwaysStoppedAnimation<Color>(
+                          Colors.yellow[800]!),
+                    ),
+                  )
+                : _drivers.isEmpty
+                    ? FadeTransition(
+                        opacity: _fadeAnim,
+                        child: Center(
+                          child: Column(
+                            mainAxisAlignment: MainAxisAlignment.center,
+                            children: [
+                              Container(
+                                width: 80, height: 80,
+                                decoration: BoxDecoration(
+                                    color: Colors.grey[100],
+                                    shape: BoxShape.circle),
+                                child: Icon(Icons.drive_eta_rounded,
+                                    size: 38, color: Colors.grey[300]),
+                              ),
+                              const SizedBox(height: 16),
+                              Text('No drivers yet',
+                                  style: TextStyle(
+                                      fontSize: 16,
+                                      fontWeight: FontWeight.w600,
+                                      color: Colors.grey[500])),
+                              const SizedBox(height: 6),
+                              Text('Tap + Add Driver to add one',
+                                  style: TextStyle(
+                                      fontSize: 13,
+                                      color: Colors.grey[400])),
+                            ],
+                          ),
+                        ),
+                      )
+                    : _filteredDrivers.isEmpty
+                        ? FadeTransition(
+                            opacity: _fadeAnim,
+                            child: Center(
+                              child: Column(
+                                mainAxisAlignment: MainAxisAlignment.center,
+                                children: [
+                                  Container(
+                                    width: 80, height: 80,
+                                    decoration: BoxDecoration(
+                                        color: Colors.grey[100],
+                                        shape: BoxShape.circle),
+                                    child: Icon(Icons.search_off_rounded,
+                                        size: 38, color: Colors.grey[300]),
+                                  ),
+                                  const SizedBox(height: 16),
+                                  Text('No results found',
+                                      style: TextStyle(
+                                          fontSize: 16,
+                                          fontWeight: FontWeight.w600,
+                                          color: Colors.grey[500])),
+                                  const SizedBox(height: 6),
+                                  Text(
+                                    'No driver named "${_searchController.text}"',
+                                    style: TextStyle(
+                                        fontSize: 13,
+                                        color: Colors.grey[400]),
+                                  ),
+                                ],
+                              ),
+                            ),
+                          )
+                        : FadeTransition(
+                            opacity: _fadeAnim,
+                            child: RefreshIndicator(
+                              color: Colors.yellow[800],
+                              onRefresh: _loadDrivers,
+                              child: ListView.builder(
+                                padding: const EdgeInsets.fromLTRB(
+                                    16, 16, 16, 100),
+                                itemCount: _filteredDrivers.length,
+                                itemBuilder: (context, index) =>
+                                    _buildDriverCard(
+                                        _filteredDrivers[index]),
+                              ),
+                            ),
+                          ),
+          ),
+        ],
+      ),
     );
   }
 

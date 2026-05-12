@@ -1,5 +1,6 @@
 import 'package:flutter/material.dart';
 import 'package:provider/provider.dart';
+import 'package:shared_preferences/shared_preferences.dart';
 import '../providers/auth_provider.dart';
 
 class RegisterScreen extends StatefulWidget {
@@ -34,11 +35,13 @@ class _RegisterScreenState extends State<RegisterScreen>
       vsync: this,
       duration: const Duration(milliseconds: 600),
     );
-    _fadeAnim = CurvedAnimation(parent: _animController, curve: Curves.easeOut);
+    _fadeAnim =
+        CurvedAnimation(parent: _animController, curve: Curves.easeOut);
     _slideAnim = Tween<Offset>(
       begin: const Offset(0, 0.08),
       end: Offset.zero,
-    ).animate(CurvedAnimation(parent: _animController, curve: Curves.easeOut));
+    ).animate(
+        CurvedAnimation(parent: _animController, curve: Curves.easeOut));
     _animController.forward();
   }
 
@@ -54,9 +57,149 @@ class _RegisterScreenState extends State<RegisterScreen>
     super.dispose();
   }
 
+  // ── Email already used dialog ─────────────────────────────────
+  void _showEmailTakenDialog() {
+    showDialog(
+      context: context,
+      barrierColor: Colors.black.withOpacity(0.5),
+      builder: (ctx) => Dialog(
+        backgroundColor: Colors.transparent,
+        elevation: 0,
+        child: Container(
+          padding: const EdgeInsets.all(28),
+          decoration: BoxDecoration(
+              color: Colors.white,
+              borderRadius: BorderRadius.circular(24)),
+          child: Column(
+            mainAxisSize: MainAxisSize.min,
+            children: [
+              Stack(alignment: Alignment.center, children: [
+                Container(
+                    width: 80, height: 80,
+                    decoration: BoxDecoration(
+                        color: Colors.orange[50],
+                        shape: BoxShape.circle)),
+                Container(
+                    width: 62, height: 62,
+                    decoration: BoxDecoration(
+                        color: Colors.orange[100],
+                        shape: BoxShape.circle)),
+                Container(
+                  width: 46, height: 46,
+                  decoration: BoxDecoration(
+                      color: Colors.orange[700],
+                      shape: BoxShape.circle),
+                  child: const Icon(Icons.email_outlined,
+                      color: Colors.white, size: 22),
+                ),
+              ]),
+              const SizedBox(height: 20),
+              const Text('Email Already Used',
+                  style: TextStyle(
+                      fontSize: 20,
+                      fontWeight: FontWeight.w800,
+                      color: Colors.black87)),
+              const SizedBox(height: 10),
+              Text(
+                'An account with this email address already exists.\n\nPlease use a different email or login to your existing account.',
+                textAlign: TextAlign.center,
+                style: TextStyle(
+                    fontSize: 14,
+                    color: Colors.grey[500],
+                    height: 1.6),
+              ),
+              const SizedBox(height: 28),
+              SizedBox(
+                width: double.infinity,
+                height: 50,
+                child: ElevatedButton(
+                  onPressed: () => Navigator.pop(ctx),
+                  style: ElevatedButton.styleFrom(
+                    backgroundColor: Colors.yellow[800],
+                    foregroundColor: Colors.white,
+                    elevation: 0,
+                    shape: RoundedRectangleBorder(
+                        borderRadius: BorderRadius.circular(14)),
+                  ),
+                  child: const Text('Try Different Email',
+                      style: TextStyle(
+                          fontSize: 15, fontWeight: FontWeight.w600)),
+                ),
+              ),
+            ],
+          ),
+        ),
+      ),
+    );
+  }
+
+  // ── Generic error dialog ──────────────────────────────────────
+  void _showErrorDialog(String message) {
+    showDialog(
+      context: context,
+      barrierColor: Colors.black.withOpacity(0.5),
+      builder: (ctx) => Dialog(
+        backgroundColor: Colors.transparent,
+        elevation: 0,
+        child: Container(
+          padding: const EdgeInsets.all(28),
+          decoration: BoxDecoration(
+              color: Colors.white,
+              borderRadius: BorderRadius.circular(24)),
+          child: Column(
+            mainAxisSize: MainAxisSize.min,
+            children: [
+              Container(
+                width: 56, height: 56,
+                decoration: BoxDecoration(
+                    color: Colors.red[50], shape: BoxShape.circle),
+                child: Icon(Icons.error_outline_rounded,
+                    color: Colors.red[400], size: 28),
+              ),
+              const SizedBox(height: 16),
+              const Text('Registration Failed',
+                  style: TextStyle(
+                      fontSize: 20,
+                      fontWeight: FontWeight.w800,
+                      color: Colors.black87)),
+              const SizedBox(height: 10),
+              Text(
+                message,
+                textAlign: TextAlign.center,
+                style: TextStyle(
+                    fontSize: 14,
+                    color: Colors.grey[500],
+                    height: 1.5),
+              ),
+              const SizedBox(height: 24),
+              SizedBox(
+                width: double.infinity,
+                height: 50,
+                child: ElevatedButton(
+                  onPressed: () => Navigator.pop(ctx),
+                  style: ElevatedButton.styleFrom(
+                    backgroundColor: Colors.yellow[800],
+                    foregroundColor: Colors.white,
+                    elevation: 0,
+                    shape: RoundedRectangleBorder(
+                        borderRadius: BorderRadius.circular(14)),
+                  ),
+                  child: const Text('Try Again',
+                      style: TextStyle(
+                          fontSize: 15, fontWeight: FontWeight.w600)),
+                ),
+              ),
+            ],
+          ),
+        ),
+      ),
+    );
+  }
+
   Future<void> _register() async {
     if (_formKey.currentState!.validate()) {
-      final authProvider = Provider.of<AuthProvider>(context, listen: false);
+      final authProvider =
+          Provider.of<AuthProvider>(context, listen: false);
 
       final success = await authProvider.register(
         name: _nameController.text.trim(),
@@ -74,26 +217,36 @@ class _RegisterScreenState extends State<RegisterScreen>
       );
 
       if (success && mounted) {
+        final prefs = await SharedPreferences.getInstance();
+        await prefs.setString(
+            'prefill_name', _nameController.text.trim());
         ScaffoldMessenger.of(context).showSnackBar(
           SnackBar(
             content: const Text('Registration successful!'),
             backgroundColor: Colors.yellow[800],
           ),
         );
-        Navigator.pop(context);
+        Navigator.pop(context, _nameController.text.trim());
       } else if (mounted) {
-        ScaffoldMessenger.of(context).showSnackBar(
-          SnackBar(
-            content:
-                Text('Registration failed: ${authProvider.errorMessage}'),
-            backgroundColor: Colors.grey[800],
-          ),
-        );
+        final error =
+            (authProvider.errorMessage ?? '').toLowerCase();
+        // Check for email already taken
+        if (error.contains('email') &&
+            (error.contains('already') ||
+                error.contains('taken') ||
+                error.contains('exists') ||
+                error.contains('registered') ||
+                error.contains('duplicate') ||
+                error.contains('unique'))) {
+          _showEmailTakenDialog();
+        } else {
+          _showErrorDialog(
+              authProvider.errorMessage ?? 'Registration failed. Please try again.');
+        }
       }
     }
   }
 
-  // ── Reusable styled field ─────────────────────────────────
   Widget _buildField({
     required TextEditingController controller,
     required String label,
@@ -145,7 +298,6 @@ class _RegisterScreenState extends State<RegisterScreen>
     );
   }
 
-  // ── Section header ────────────────────────────────────────
   Widget _sectionHeader(String title, IconData icon) {
     return Row(
       children: [
@@ -189,8 +341,8 @@ class _RegisterScreenState extends State<RegisterScreen>
               borderRadius: BorderRadius.circular(10),
               border: Border.all(color: Colors.yellow[200]!),
             ),
-            child:
-                Icon(Icons.arrow_back_ios_new, color: Colors.yellow[800], size: 16),
+            child: Icon(Icons.arrow_back_ios_new,
+                color: Colors.yellow[800], size: 16),
           ),
           onPressed: () => Navigator.pop(context),
         ),
@@ -215,7 +367,6 @@ class _RegisterScreenState extends State<RegisterScreen>
               child: Column(
                 crossAxisAlignment: CrossAxisAlignment.stretch,
                 children: [
-                  // ── Top banner ──────────────────────────────
                   Container(
                     padding: const EdgeInsets.symmetric(
                         horizontal: 20, vertical: 20),
@@ -226,8 +377,7 @@ class _RegisterScreenState extends State<RegisterScreen>
                     child: Row(
                       children: [
                         Container(
-                          width: 52,
-                          height: 52,
+                          width: 52, height: 52,
                           decoration: BoxDecoration(
                             color: Colors.white.withOpacity(0.2),
                             shape: BoxShape.circle,
@@ -253,9 +403,7 @@ class _RegisterScreenState extends State<RegisterScreen>
                               Text(
                                 'Fill in your details below to get started',
                                 style: TextStyle(
-                                  color: Colors.white70,
-                                  fontSize: 12,
-                                ),
+                                    color: Colors.white70, fontSize: 12),
                               ),
                             ],
                           ),
@@ -266,8 +414,8 @@ class _RegisterScreenState extends State<RegisterScreen>
 
                   const SizedBox(height: 24),
 
-                  // ── Personal info section ───────────────────
-                  _sectionHeader('Personal Information', Icons.person_outline),
+                  _sectionHeader(
+                      'Personal Information', Icons.person_outline),
                   const SizedBox(height: 14),
 
                   _buildField(
@@ -341,11 +489,10 @@ class _RegisterScreenState extends State<RegisterScreen>
                   ),
                   const SizedBox(height: 20),
 
-                  // ── Account type section ────────────────────
-                  _sectionHeader('Account Type', Icons.switch_account_outlined),
+                  _sectionHeader(
+                      'Account Type', Icons.switch_account_outlined),
                   const SizedBox(height: 14),
 
-                  // Passenger / Driver toggle cards
                   Row(
                     children: [
                       Expanded(
@@ -353,7 +500,8 @@ class _RegisterScreenState extends State<RegisterScreen>
                           label: 'Passenger',
                           icon: Icons.airline_seat_recline_normal,
                           selected: _userType == 'passenger',
-                          onTap: () => setState(() => _userType = 'passenger'),
+                          onTap: () =>
+                              setState(() => _userType = 'passenger'),
                         ),
                       ),
                       const SizedBox(width: 12),
@@ -362,20 +510,19 @@ class _RegisterScreenState extends State<RegisterScreen>
                           label: 'Driver',
                           icon: Icons.drive_eta_outlined,
                           selected: _userType == 'driver',
-                          onTap: () => setState(() => _userType = 'driver'),
+                          onTap: () =>
+                              setState(() => _userType = 'driver'),
                         ),
                       ),
                     ],
                   ),
 
-                  // ── Driver section ──────────────────────────
                   if (_userType == 'driver') ...[
                     const SizedBox(height: 24),
-                    _sectionHeader(
-                        'Driver Information', Icons.directions_car_outlined),
+                    _sectionHeader('Driver Information',
+                        Icons.directions_car_outlined),
                     const SizedBox(height: 14),
 
-                    // Vehicle type chips
                     Container(
                       padding: const EdgeInsets.all(14),
                       decoration: BoxDecoration(
@@ -411,8 +558,8 @@ class _RegisterScreenState extends State<RegisterScreen>
                               final selected = _vehicleType == type;
                               return Expanded(
                                 child: GestureDetector(
-                                  onTap: () =>
-                                      setState(() => _vehicleType = type),
+                                  onTap: () => setState(
+                                      () => _vehicleType = type),
                                   child: Container(
                                     margin: const EdgeInsets.symmetric(
                                         horizontal: 4),
@@ -422,7 +569,8 @@ class _RegisterScreenState extends State<RegisterScreen>
                                       color: selected
                                           ? Colors.yellow[800]
                                           : Colors.yellow[50],
-                                      borderRadius: BorderRadius.circular(10),
+                                      borderRadius:
+                                          BorderRadius.circular(10),
                                       border: Border.all(
                                         color: selected
                                             ? Colors.yellow[800]!
@@ -482,7 +630,6 @@ class _RegisterScreenState extends State<RegisterScreen>
 
                   const SizedBox(height: 32),
 
-                  // ── Register button ─────────────────────────
                   authProvider.isLoading
                       ? Center(
                           child: CircularProgressIndicator(
@@ -507,9 +654,11 @@ class _RegisterScreenState extends State<RegisterScreen>
                               ),
                             ),
                             child: const Row(
-                              mainAxisAlignment: MainAxisAlignment.center,
+                              mainAxisAlignment:
+                                  MainAxisAlignment.center,
                               children: [
-                                Icon(Icons.check_circle_outline, size: 20),
+                                Icon(Icons.check_circle_outline,
+                                    size: 20),
                                 SizedBox(width: 10),
                                 Text(
                                   'Create Account',
@@ -526,7 +675,6 @@ class _RegisterScreenState extends State<RegisterScreen>
 
                   const SizedBox(height: 20),
 
-                  // ── Footer ──────────────────────────────────
                   Center(
                     child: Row(
                       mainAxisAlignment: MainAxisAlignment.center,
@@ -536,8 +684,8 @@ class _RegisterScreenState extends State<RegisterScreen>
                         const SizedBox(width: 5),
                         Text(
                           'Online Taxi Service',
-                          style:
-                              TextStyle(color: Colors.grey[500], fontSize: 11),
+                          style: TextStyle(
+                              color: Colors.grey[500], fontSize: 11),
                         ),
                       ],
                     ),
@@ -552,7 +700,6 @@ class _RegisterScreenState extends State<RegisterScreen>
   }
 }
 
-// ── Account type card ─────────────────────────────────────────
 class _TypeCard extends StatelessWidget {
   final String label;
   final IconData icon;

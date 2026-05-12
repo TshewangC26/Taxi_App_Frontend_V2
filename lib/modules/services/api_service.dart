@@ -4,7 +4,7 @@ import 'package:http/http.dart' as http;
 import 'package:shared_preferences/shared_preferences.dart';
 
 class ApiService {
-  static const String baseUrl = 'http://127.0.0.1:8000/api';
+  static const String baseUrl = 'https://taxiappbackendv2-kspb-production.up.railway.app/api';
 
   Future<String?> getToken() async {
     final prefs = await SharedPreferences.getInstance();
@@ -77,7 +77,6 @@ class ApiService {
     return _handleResponse(response);
   }
 
-  // ── Update user profile (name + phone + optional photo) ───────
   Future<Map<String, dynamic>> updateProfile({
     required String name,
     required String phone,
@@ -110,8 +109,6 @@ class ApiService {
     return _handleResponse(response);
   }
 
-  // ── Generic multipart POST (fields + optional single file) ────
-  // Used for driver profile update with optional QR code image.
   Future<Map<String, dynamic>> postMultipart(
     String endpoint, {
     required Map<String, String> fields,
@@ -144,13 +141,10 @@ class ApiService {
     return _handleResponse(response);
   }
 
-  // ── Get driver payment details for a booking ──────────────────
-  Future<Map<String, dynamic>> getDriverPaymentDetails(
-      int bookingId) async {
+  Future<Map<String, dynamic>> getDriverPaymentDetails(int bookingId) async {
     return await get('/driver/payment-details/$bookingId');
   }
 
-  // ── Create payment with optional screenshot ───────────────────
   Future<Map<String, dynamic>> createPayment({
     required int bookingId,
     required String paymentMethod,

@@ -8,12 +8,14 @@ class AuthProvider with ChangeNotifier {
   User? _user;
   bool _isLoading = false;
   String? _errorMessage;
+  String? _resetUserName;
 
   // Getters
   User? get user => _user;
   bool get isLoading => _isLoading;
   String? get errorMessage => _errorMessage;
   bool get isAuthenticated => _user != null;
+  String? get resetUserName => _resetUserName;
 
   // Register new user
   Future<bool> register({
@@ -178,14 +180,17 @@ class AuthProvider with ChangeNotifier {
     notifyListeners();
 
     try {
-      await _apiService.post('/forgot-password', {
+      final response = await _apiService.post('/forgot-password', {
         'email': email,
       });
+
+      _resetUserName = response['userName'];
 
       _isLoading = false;
       notifyListeners();
       return true;
-    } catch (e) {
+    } 
+    catch (e) {
       _errorMessage = e.toString();
       _isLoading    = false;
       notifyListeners();
