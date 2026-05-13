@@ -10,14 +10,12 @@ class AuthProvider with ChangeNotifier {
   String? _errorMessage;
   String? _resetUserName;
 
-  // Getters
   User? get user => _user;
   bool get isLoading => _isLoading;
   String? get errorMessage => _errorMessage;
   bool get isAuthenticated => _user != null;
   String? get resetUserName => _resetUserName;
 
-  // Register new user
   Future<bool> register({
     required String name,
     required String email,
@@ -45,7 +43,6 @@ class AuthProvider with ChangeNotifier {
       };
 
       final response = await _apiService.post('/register', data);
-
       await _apiService.saveToken(response['token']);
       _user = User.fromJson(response['user']);
 
@@ -60,7 +57,6 @@ class AuthProvider with ChangeNotifier {
     }
   }
 
-  // ✅ Login with name, password and optional FCM token
   Future<bool> login(
     String name,
     String password, {
@@ -91,23 +87,22 @@ class AuthProvider with ChangeNotifier {
     }
   }
 
-  // Logout
   Future<void> logout() async {
     try {
       await _apiService.post('/logout', {});
     } catch (e) {
       // Ignore error, logout anyway
     }
-
     await _apiService.removeToken();
     _user = null;
     notifyListeners();
   }
 
-  // Update profile
+  // ✅ Updated to support email
   Future<bool> updateProfile({
     required String name,
     required String phone,
+    String? email,
     String? imagePath,
   }) async {
     _isLoading    = true;
@@ -118,6 +113,7 @@ class AuthProvider with ChangeNotifier {
       final response = await _apiService.updateProfile(
         name:      name,
         phone:     phone,
+        email:     email,
         imagePath: imagePath,
       );
 
@@ -134,7 +130,6 @@ class AuthProvider with ChangeNotifier {
     }
   }
 
-  // Load user profile from API
   Future<void> loadUserProfile() async {
     try {
       final response = await _apiService.get('/profile');
@@ -145,7 +140,6 @@ class AuthProvider with ChangeNotifier {
     }
   }
 
-  // Change password
   Future<bool> changePassword({
     required String currentPassword,
     required String newPassword,
@@ -173,7 +167,6 @@ class AuthProvider with ChangeNotifier {
     }
   }
 
-  // Forgot Password
   Future<bool> forgotPassword({required String email}) async {
     _isLoading    = true;
     _errorMessage = null;
@@ -189,8 +182,7 @@ class AuthProvider with ChangeNotifier {
       _isLoading = false;
       notifyListeners();
       return true;
-    } 
-    catch (e) {
+    } catch (e) {
       _errorMessage = e.toString();
       _isLoading    = false;
       notifyListeners();
@@ -198,7 +190,6 @@ class AuthProvider with ChangeNotifier {
     }
   }
 
-  // Reset Password
   Future<bool> resetPassword({
     required String email,
     required String token,

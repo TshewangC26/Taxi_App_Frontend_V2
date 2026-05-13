@@ -77,9 +77,11 @@ class ApiService {
     return _handleResponse(response);
   }
 
+  // ✅ Updated to support email
   Future<Map<String, dynamic>> updateProfile({
     required String name,
     required String phone,
+    String? email,
     String? imagePath,
   }) async {
     final token = await getToken();
@@ -96,6 +98,9 @@ class ApiService {
 
     request.fields['name']  = name;
     request.fields['phone'] = phone;
+    if (email != null && email.isNotEmpty) {
+      request.fields['email'] = email;
+    }
 
     if (imagePath != null) {
       request.files.add(

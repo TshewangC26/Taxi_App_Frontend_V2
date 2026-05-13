@@ -16,15 +16,26 @@ class DriverPaymentDetailsScreen extends StatefulWidget {
 
 class _DriverPaymentDetailsScreenState
     extends State<DriverPaymentDetailsScreen> {
-  final _formKey           = GlobalKey<FormState>();
-  final _bankNameController        = TextEditingController();
+  final _formKey                   = GlobalKey<FormState>();
   final _accountHolderController   = TextEditingController();
   final _accountNumberController   = TextEditingController();
   final _mobileNumberController    = TextEditingController();
   final ApiService _apiService     = ApiService();
 
-  bool _isLoading      = false;
-  bool _isUploadingQR  = false;
+  // ✅ Hardcoded bank list
+  static const List<String> _banks = [
+    'Bhutan National Bank Ltd',
+    'Druk PNB Ltd',
+    'Bhutan Development Bank Ltd',
+    'T Bank Ltd',
+    'DK Bank',
+    'Bank of Bhutan',
+  ];
+
+  String? _selectedBank;
+
+  bool _isLoading     = false;
+  bool _isUploadingQR = false;
   File? _qrCodeFile;
 
   @override
@@ -41,8 +52,11 @@ class _DriverPaymentDetailsScreenState
     driverProvider.getProfile().then((_) {
       final profile = driverProvider.driverProfile;
       if (profile != null) {
-        _bankNameController.text =
-            profile['bank_name'] ?? '';
+        setState(() {
+          // ✅ Set selected bank from saved value
+          final savedBank = profile['bank_name'] ?? '';
+          _selectedBank = _banks.contains(savedBank) ? savedBank : null;
+        });
         _accountHolderController.text =
             profile['account_holder_name'] ?? '';
         _accountNumberController.text =
@@ -55,7 +69,6 @@ class _DriverPaymentDetailsScreenState
 
   @override
   void dispose() {
-    _bankNameController.dispose();
     _accountHolderController.dispose();
     _accountNumberController.dispose();
     _mobileNumberController.dispose();
@@ -75,12 +88,9 @@ class _DriverPaymentDetailsScreenState
     }
   }
 
-  // ✅ Upload QR code separately and permanently
   Future<void> _uploadQRCode() async {
     if (_qrCodeFile == null) return;
-
     setState(() => _isUploadingQR = true);
-
     try {
       final token = await _apiService.getToken();
       final request = http.MultipartRequest(
@@ -92,48 +102,29 @@ class _DriverPaymentDetailsScreenState
         if (token != null) 'Authorization': 'Bearer $token',
       });
       request.files.add(
-        await http.MultipartFile.fromPath(
-          'qr_code',
-          _qrCodeFile!.path,
-        ),
+        await http.MultipartFile.fromPath('qr_code', _qrCodeFile!.path),
       );
       final response = await request.send();
-
       if (mounted) {
         if (response.statusCode == 200) {
-          // Reload profile to get new QR URL
-          await Provider.of<DriverProvider>(context, listen: false)
-              .getProfile();
-          setState(() {
-            _qrCodeFile = null; // Clear local file, show server image
-          });
+          await Provider.of<DriverProvider>(context, listen: false).getProfile();
+          setState(() { _qrCodeFile = null; });
           ScaffoldMessenger.of(context).showSnackBar(
-            const SnackBar(
-              content: Text('QR Code updated successfully! ✅'),
-              backgroundColor: Colors.green,
-            ),
+            const SnackBar(content: Text('QR Code updated successfully! ✅'), backgroundColor: Colors.green),
           );
         } else {
           ScaffoldMessenger.of(context).showSnackBar(
-            const SnackBar(
-              content: Text('QR Code upload failed!'),
-              backgroundColor: Colors.red,
-            ),
+            const SnackBar(content: Text('QR Code upload failed!'), backgroundColor: Colors.red),
           );
         }
       }
     } catch (e) {
-      print('QR upload error: $e');
       if (mounted) {
         ScaffoldMessenger.of(context).showSnackBar(
-          const SnackBar(
-            content: Text('QR Code upload error!'),
-            backgroundColor: Colors.red,
-          ),
+          const SnackBar(content: Text('QR Code upload error!'), backgroundColor: Colors.red),
         );
       }
     }
-
     if (mounted) setState(() => _isUploadingQR = false);
   }
 
@@ -145,13 +136,12 @@ class _DriverPaymentDetailsScreenState
           Provider.of<DriverProvider>(context, listen: false);
 
       final success = await driverProvider.updateBankDetails(
-        bankName:            _bankNameController.text,
+        bankName:            _selectedBank ?? '',
         accountHolderName:   _accountHolderController.text,
         accountNumber:       _accountNumberController.text,
         mobilePaymentNumber: _mobileNumberController.text,
       );
 
-      // Upload QR code if a new one was selected
       if (_qrCodeFile != null && success) {
         await _uploadQRCode();
       }
@@ -161,19 +151,12 @@ class _DriverPaymentDetailsScreenState
       if (mounted) {
         if (success) {
           ScaffoldMessenger.of(context).showSnackBar(
-            const SnackBar(
-              content: Text('Payment details saved successfully! ✅'),
-              backgroundColor: Colors.green,
-            ),
+            const SnackBar(content: Text('Payment details saved successfully! ✅'), backgroundColor: Colors.green),
           );
           Navigator.pop(context);
         } else {
           ScaffoldMessenger.of(context).showSnackBar(
-            SnackBar(
-              content: Text(
-                  driverProvider.errorMessage ?? 'Update failed!'),
-              backgroundColor: Colors.red,
-            ),
+            SnackBar(content: Text(driverProvider.errorMessage ?? 'Update failed!'), backgroundColor: Colors.red),
           );
         }
       }
@@ -183,8 +166,7 @@ class _DriverPaymentDetailsScreenState
   @override
   Widget build(BuildContext context) {
     final driverProvider = Provider.of<DriverProvider>(context);
-    final existingQR =
-        driverProvider.driverProfile?['qr_code_image'];
+    final existingQR = driverProvider.driverProfile?['qr_code_image'];
 
     return Scaffold(
       appBar: AppBar(
@@ -197,48 +179,30 @@ class _DriverPaymentDetailsScreenState
               child: Form(
                 key: _formKey,
                 child: Column(
-                  crossAxisAlignment:
-                      CrossAxisAlignment.stretch,
+                  crossAxisAlignment: CrossAxisAlignment.stretch,
                   children: [
-                    // ── INFO BANNER ──
-                    Container(
-                      padding: const EdgeInsets.all(12),
-                      decoration: BoxDecoration(
-                        color: Colors.blue.shade50,
-                        borderRadius:
-                            BorderRadius.circular(8),
-                        border: Border.all(
-                            color: Colors.blue.shade200),
-                      ),
-                      child: Row(children: [
-                        Icon(Icons.info,
-                            color: Colors.blue.shade700),
-                        const SizedBox(width: 8),
-                        const Expanded(
-                          child: Text(
-                            'These details will be shown to passengers when they pay online.',
-                            style: TextStyle(fontSize: 13),
-                          ),
-                        ),
-                      ]),
-                    ),
-                    const SizedBox(height: 24),
-
+                   
                     // ── BANK DETAILS ──
                     const Text('Bank Details',
-                        style: TextStyle(
-                            fontSize: 16,
-                            fontWeight: FontWeight.bold)),
+                        style: TextStyle(fontSize: 16, fontWeight: FontWeight.bold)),
                     const SizedBox(height: 12),
 
-                    TextFormField(
-                      controller: _bankNameController,
-                      decoration: const InputDecoration(
+                    // ✅ Bank dropdown
+                    DropdownButtonFormField<String>(
+                      value: _selectedBank,
+                      decoration: InputDecoration(
                         labelText: 'Bank Name',
-                        border: OutlineInputBorder(),
-                        prefixIcon:
-                            Icon(Icons.account_balance),
+                        border: const OutlineInputBorder(),
+                        prefixIcon: const Icon(Icons.account_balance),
+                        labelStyle: TextStyle(color: Colors.grey[600]),
                       ),
+                      hint: const Text('Select Bank'),
+                      items: _banks.map((bank) => DropdownMenuItem(
+                        value: bank,
+                        child: Text(bank),
+                      )).toList(),
+                      onChanged: (v) => setState(() => _selectedBank = v),
+                      validator: (v) => (v == null || v.isEmpty) ? 'Please select a bank' : null,
                     ),
                     const SizedBox(height: 12),
 
@@ -265,9 +229,7 @@ class _DriverPaymentDetailsScreenState
 
                     // ── MOBILE PAYMENT ──
                     const Text('Mobile Payment',
-                        style: TextStyle(
-                            fontSize: 16,
-                            fontWeight: FontWeight.bold)),
+                        style: TextStyle(fontSize: 16, fontWeight: FontWeight.bold)),
                     const SizedBox(height: 12),
 
                     TextFormField(
@@ -283,176 +245,84 @@ class _DriverPaymentDetailsScreenState
 
                     // ── QR CODE SECTION ──
                     Row(
-                      mainAxisAlignment:
-                          MainAxisAlignment.spaceBetween,
+                      mainAxisAlignment: MainAxisAlignment.spaceBetween,
                       children: [
                         const Text('QR Code',
-                            style: TextStyle(
-                                fontSize: 16,
-                                fontWeight: FontWeight.bold)),
+                            style: TextStyle(fontSize: 16, fontWeight: FontWeight.bold)),
                         if (existingQR != null)
                           TextButton.icon(
                             onPressed: _pickQRCode,
-                            icon: const Icon(Icons.edit,
-                                size: 16),
+                            icon: const Icon(Icons.edit, size: 16),
                             label: const Text('Update QR'),
                           ),
                       ],
                     ),
                     const SizedBox(height: 12),
 
-                    // QR Code Display
                     GestureDetector(
                       onTap: _pickQRCode,
                       child: Container(
                         height: 180,
                         decoration: BoxDecoration(
-                          border: Border.all(
-                              color: Colors.grey.shade300),
-                          borderRadius:
-                              BorderRadius.circular(12),
+                          border: Border.all(color: Colors.grey.shade300),
+                          borderRadius: BorderRadius.circular(12),
                           color: Colors.grey.shade50,
                         ),
                         child: _qrCodeFile != null
-                            // New file selected — show preview
-                            ? Stack(
-                                children: [
-                                  ClipRRect(
-                                    borderRadius:
-                                        BorderRadius.circular(
-                                            12),
-                                    child: Image.file(
-                                      _qrCodeFile!,
-                                      width: double.infinity,
-                                      height: 180,
-                                      fit: BoxFit.contain,
-                                    ),
+                            ? Stack(children: [
+                                ClipRRect(
+                                  borderRadius: BorderRadius.circular(12),
+                                  child: Image.file(_qrCodeFile!, width: double.infinity, height: 180, fit: BoxFit.contain),
+                                ),
+                                Positioned(top: 8, right: 8,
+                                  child: Container(
+                                    padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
+                                    decoration: BoxDecoration(color: Colors.orange, borderRadius: BorderRadius.circular(8)),
+                                    child: const Text('New — Not saved yet', style: TextStyle(color: Colors.white, fontSize: 11)),
                                   ),
-                                  Positioned(
-                                    top: 8,
-                                    right: 8,
-                                    child: Container(
-                                      padding:
-                                          const EdgeInsets
-                                              .symmetric(
-                                              horizontal: 8,
-                                              vertical: 4),
-                                      decoration:
-                                          BoxDecoration(
-                                        color: Colors.orange,
-                                        borderRadius:
-                                            BorderRadius
-                                                .circular(8),
-                                      ),
-                                      child: const Text(
-                                        'New — Not saved yet',
-                                        style: TextStyle(
-                                            color:
-                                                Colors.white,
-                                            fontSize: 11),
-                                      ),
-                                    ),
-                                  ),
-                                ],
-                              )
+                                ),
+                              ])
                             : existingQR != null
-                                // Existing QR from server
-                                ? Stack(
-                                    children: [
-                                      ClipRRect(
-                                        borderRadius:
-                                            BorderRadius
-                                                .circular(12),
-                                        child: Image.network(
-                                          existingQR,
-                                          width:
-                                              double.infinity,
-                                          height: 180,
-                                          fit: BoxFit.contain,
-                                          errorBuilder: (c, e,
-                                                  s) =>
-                                              const Icon(
-                                                  Icons.qr_code,
-                                                  size: 80,
-                                                  color: Colors
-                                                      .grey),
-                                        ),
+                                ? Stack(children: [
+                                    ClipRRect(
+                                      borderRadius: BorderRadius.circular(12),
+                                      child: Image.network(existingQR, width: double.infinity, height: 180, fit: BoxFit.contain,
+                                          errorBuilder: (c, e, s) => const Icon(Icons.qr_code, size: 80, color: Colors.grey)),
+                                    ),
+                                    Positioned(top: 8, right: 8,
+                                      child: Container(
+                                        padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
+                                        decoration: BoxDecoration(color: Colors.green, borderRadius: BorderRadius.circular(8)),
+                                        child: const Text('Saved ✅', style: TextStyle(color: Colors.white, fontSize: 11)),
                                       ),
-                                      Positioned(
-                                        top: 8,
-                                        right: 8,
-                                        child: Container(
-                                          padding:
-                                              const EdgeInsets
-                                                  .symmetric(
-                                                  horizontal: 8,
-                                                  vertical: 4),
-                                          decoration:
-                                              BoxDecoration(
-                                            color: Colors.green,
-                                            borderRadius:
-                                                BorderRadius
-                                                    .circular(8),
-                                          ),
-                                          child: const Text(
-                                            'Saved ✅',
-                                            style: TextStyle(
-                                                color: Colors
-                                                    .white,
-                                                fontSize: 11),
-                                          ),
-                                        ),
-                                      ),
-                                    ],
-                                  )
-                                // No QR yet
+                                    ),
+                                  ])
                                 : const Column(
-                                    mainAxisAlignment:
-                                        MainAxisAlignment
-                                            .center,
+                                    mainAxisAlignment: MainAxisAlignment.center,
                                     children: [
-                                      Icon(Icons.qr_code,
-                                          size: 56,
-                                          color: Colors.grey),
+                                      Icon(Icons.qr_code, size: 56, color: Colors.grey),
                                       SizedBox(height: 8),
-                                      Text(
-                                        'Tap to upload QR code',
-                                        style: TextStyle(
-                                            color: Colors.grey),
-                                      ),
+                                      Text('Tap to upload QR code', style: TextStyle(color: Colors.grey)),
                                       SizedBox(height: 4),
-                                      Text(
-                                        'Passengers will scan this to pay',
-                                        style: TextStyle(
-                                            color: Colors.grey,
-                                            fontSize: 12),
-                                      ),
+                                      Text('Passengers will scan this to pay', style: TextStyle(color: Colors.grey, fontSize: 12)),
                                     ],
                                   ),
                       ),
                     ),
 
-                    // ✅ Upload QR button (shows only when new file selected)
                     if (_qrCodeFile != null) ...[
                       const SizedBox(height: 12),
                       SizedBox(
                         height: 45,
                         child: _isUploadingQR
-                            ? const Center(
-                                child:
-                                    CircularProgressIndicator())
+                            ? const Center(child: CircularProgressIndicator())
                             : ElevatedButton.icon(
                                 onPressed: _uploadQRCode,
-                                icon: const Icon(
-                                    Icons.upload),
-                                label: const Text(
-                                    'Upload QR Code Now'),
-                                style:
-                                    ElevatedButton.styleFrom(
-                                  backgroundColor:
-                                      Colors.orange,
-                                  foregroundColor:
-                                      Colors.white,
+                                icon: const Icon(Icons.upload),
+                                label: const Text('Upload QR Code Now'),
+                                style: ElevatedButton.styleFrom(
+                                  backgroundColor: Colors.orange,
+                                  foregroundColor: Colors.white,
                                 ),
                               ),
                       ),
@@ -464,17 +334,11 @@ class _DriverPaymentDetailsScreenState
                     SizedBox(
                       height: 50,
                       child: _isLoading
-                          ? const Center(
-                              child:
-                                  CircularProgressIndicator())
+                          ? const Center(child: CircularProgressIndicator())
                           : ElevatedButton.icon(
                               onPressed: _saveDetails,
                               icon: const Icon(Icons.save),
-                              label: const Text(
-                                'Save Payment Details',
-                                style:
-                                    TextStyle(fontSize: 16),
-                              ),
+                              label: const Text('Save Payment Details', style: TextStyle(fontSize: 16)),
                               style: ElevatedButton.styleFrom(
                                 backgroundColor: Colors.teal,
                                 foregroundColor: Colors.white,
