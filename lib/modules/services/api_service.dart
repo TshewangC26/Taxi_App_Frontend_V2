@@ -6,6 +6,10 @@ import 'package:shared_preferences/shared_preferences.dart';
 class ApiService {
   static const String baseUrl = 'https://taxiappbackendv2-kspb-production.up.railway.app/api';
 
+  // ✅ Cloudinary credentials
+  static const String _cloudinaryCloudName = 'dh0m3238u';
+  static const String _cloudinaryUploadPreset = 'easy_ride';
+
   Future<String?> getToken() async {
     final prefs = await SharedPreferences.getInstance();
     return prefs.getString('auth_token');
@@ -77,7 +81,35 @@ class ApiService {
     return _handleResponse(response);
   }
 
-  // ✅ Updated to support email
+  // ✅ Upload image to Cloudinary and return download URL
+  Future<String?> uploadImageToCloudinary(String imagePath) async {
+    try {
+      final url = Uri.parse(
+          'https://api.cloudinary.com/v1_1/$_cloudinaryCloudName/image/upload');
+
+      final request = http.MultipartRequest('POST', url);
+      request.fields['upload_preset'] = _cloudinaryUploadPreset;
+      request.files.add(
+        await http.MultipartFile.fromPath('file', imagePath),
+      );
+
+      final response = await request.send();
+      final responseBody = await response.stream.bytesToString();
+      final data = jsonDecode(responseBody);
+
+      if (response.statusCode == 200) {
+        return data['secure_url'];
+      } else {
+        print('Cloudinary upload error: $responseBody');
+        return null;
+      }
+    } catch (e) {
+      print('Cloudinary upload exception: $e');
+      return null;
+    }
+  }
+
+  // ✅ Updated to upload photo to Cloudinary first
   Future<Map<String, dynamic>> updateProfile({
     required String name,
     required String phone,
@@ -85,6 +117,11 @@ class ApiService {
     String? imagePath,
   }) async {
     final token = await getToken();
+
+    String? photoUrl;
+    if (imagePath != null) {
+      photoUrl = await uploadImageToCloudinary(imagePath);
+    }
 
     final request = http.MultipartRequest(
       'POST',
@@ -101,11 +138,8 @@ class ApiService {
     if (email != null && email.isNotEmpty) {
       request.fields['email'] = email;
     }
-
-    if (imagePath != null) {
-      request.files.add(
-        await http.MultipartFile.fromPath('profile_photo', imagePath),
-      );
+    if (photoUrl != null) {
+      request.fields['profile_photo_url'] = photoUrl;
     }
 
     final streamedResponse = await request.send();
@@ -185,6 +219,18 @@ class ApiService {
     final response = await http.Response.fromStream(streamedResponse);
 
     return _handleResponse(response);
+  }
+
+  // ✅ Rate a driver after completed ride
+  Future<Map<String, dynamic>> rateDriver({
+    required int bookingId,
+    required int rating,
+    String? comment,
+  }) async {
+    return await post('/bookings/$bookingId/rate', {
+      'rating':         rating,
+      'rating_comment': comment ?? '',
+    });
   }
 
   Map<String, dynamic> _handleResponse(http.Response response) {

@@ -2,7 +2,7 @@ class Booking {
   final int id;
   final int passengerId;
   final int? driverId;
-  final int? driverFirebaseId; // Driver table ID for Firebase tracking
+  final int? driverFirebaseId;
   final String pickupLocation;
   final String dropoffLocation;
   final String vehicleType;
@@ -15,6 +15,8 @@ class Booking {
   final String createdAt;
   final double? passengerLatitude;
   final double? passengerLongitude;
+  // ✅ Rating field
+  final int? rating;
 
   Booking({
     required this.id,
@@ -33,6 +35,7 @@ class Booking {
     required this.createdAt,
     this.passengerLatitude,
     this.passengerLongitude,
+    this.rating,
   });
 
   factory Booking.fromJson(Map<String, dynamic> json) {
@@ -51,33 +54,38 @@ class Booking {
       scheduledDate:     json['scheduled_date'],
       scheduledTime:     json['scheduled_time'],
       createdAt:         json['created_at'],
-      passengerLatitude:  json['passenger_latitude'] != null
+      passengerLatitude: json['passenger_latitude'] != null
           ? double.tryParse(json['passenger_latitude'].toString())
           : null,
       passengerLongitude: json['passenger_longitude'] != null
           ? double.tryParse(json['passenger_longitude'].toString())
+          : null,
+      // ✅ Parse rating from API response
+      rating: json['rating'] != null
+          ? int.tryParse(json['rating'].toString())
           : null,
     );
   }
 
   Map<String, dynamic> toJson() {
     return {
-      'id':                   id,
-      'passenger_id':         passengerId,
-      'driver_id':            driverId,
-      'driver_firebase_id':   driverFirebaseId,
-      'pickup_location':      pickupLocation,
-      'dropoff_location':     dropoffLocation,
-      'vehicle_type':         vehicleType,
-      'estimated_price':      estimatedPrice,
-      'final_price':          finalPrice,
-      'status':               status,
-      'booking_type':         bookingType,
-      'scheduled_date':       scheduledDate,
-      'scheduled_time':       scheduledTime,
-      'created_at':           createdAt,
-      'passenger_latitude':   passengerLatitude,
-      'passenger_longitude':  passengerLongitude,
+      'id':                  id,
+      'passenger_id':        passengerId,
+      'driver_id':           driverId,
+      'driver_firebase_id':  driverFirebaseId,
+      'pickup_location':     pickupLocation,
+      'dropoff_location':    dropoffLocation,
+      'vehicle_type':        vehicleType,
+      'estimated_price':     estimatedPrice,
+      'final_price':         finalPrice,
+      'status':              status,
+      'booking_type':        bookingType,
+      'scheduled_date':      scheduledDate,
+      'scheduled_time':      scheduledTime,
+      'created_at':          createdAt,
+      'passenger_latitude':  passengerLatitude,
+      'passenger_longitude': passengerLongitude,
+      'rating':              rating,
     };
   }
 }

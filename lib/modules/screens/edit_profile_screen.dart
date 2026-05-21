@@ -17,7 +17,7 @@ class _EditProfileScreenState extends State<EditProfileScreen>
   final _formKey = GlobalKey<FormState>();
   final _nameController  = TextEditingController();
   final _phoneController = TextEditingController();
-  final _emailController = TextEditingController(); // ✅ Added
+  final _emailController = TextEditingController();
   bool _isLoading = false;
   File? _selectedImage;
   Uint8List? _webImage;
@@ -31,28 +31,17 @@ class _EditProfileScreenState extends State<EditProfileScreen>
   void initState() {
     super.initState();
 
-    _animController = AnimationController(
-      vsync: this,
-      duration: const Duration(milliseconds: 500),
-    );
-    _fadeAnim = CurvedAnimation(
-      parent: _animController,
-      curve: const Interval(0.0, 0.7, curve: Curves.easeOut),
-    );
-    _slideAnim = Tween<Offset>(
-      begin: const Offset(0, 0.06),
-      end: Offset.zero,
-    ).animate(CurvedAnimation(
-      parent: _animController,
-      curve: const Interval(0.0, 0.7, curve: Curves.easeOut),
-    ));
+    _animController = AnimationController(vsync: this, duration: const Duration(milliseconds: 500));
+    _fadeAnim = CurvedAnimation(parent: _animController, curve: const Interval(0.0, 0.7, curve: Curves.easeOut));
+    _slideAnim = Tween<Offset>(begin: const Offset(0, 0.06), end: Offset.zero).animate(
+        CurvedAnimation(parent: _animController, curve: const Interval(0.0, 0.7, curve: Curves.easeOut)));
     _animController.forward();
 
     final user = Provider.of<AuthProvider>(context, listen: false).user;
     if (user != null) {
       _nameController.text  = user.name;
       _phoneController.text = user.phone ?? '';
-      _emailController.text = user.email ?? ''; // ✅ Added
+      _emailController.text = user.email ?? '';
     }
   }
 
@@ -61,30 +50,19 @@ class _EditProfileScreenState extends State<EditProfileScreen>
     _animController.dispose();
     _nameController.dispose();
     _phoneController.dispose();
-    _emailController.dispose(); // ✅ Added
+    _emailController.dispose();
     super.dispose();
   }
 
   Future<void> _pickImage() async {
     final ImagePicker picker = ImagePicker();
-    final XFile? image = await picker.pickImage(
-      source: ImageSource.gallery,
-      imageQuality: 80,
-    );
+    final XFile? image = await picker.pickImage(source: ImageSource.gallery, imageQuality: 80);
     if (image != null) {
       if (kIsWeb) {
         final bytes = await image.readAsBytes();
-        setState(() {
-          _webImage      = bytes;
-          _imagePath     = image.path;
-          _selectedImage = null;
-        });
+        setState(() { _webImage = bytes; _imagePath = image.path; _selectedImage = null; });
       } else {
-        setState(() {
-          _selectedImage = File(image.path);
-          _imagePath     = image.path;
-          _webImage      = null;
-        });
+        setState(() { _selectedImage = File(image.path); _imagePath = image.path; _webImage = null; });
       }
     }
   }
@@ -94,11 +72,10 @@ class _EditProfileScreenState extends State<EditProfileScreen>
       setState(() => _isLoading = true);
 
       final authProvider = Provider.of<AuthProvider>(context, listen: false);
-
       final success = await authProvider.updateProfile(
         name:      _nameController.text.trim(),
         phone:     _phoneController.text.trim(),
-        email:     _emailController.text.trim(), // ✅ Added
+        email:     _emailController.text.trim(),
         imagePath: _imagePath,
       );
 
@@ -106,34 +83,26 @@ class _EditProfileScreenState extends State<EditProfileScreen>
 
       if (mounted) {
         if (success) {
+          // ✅ Clear image cache so new photo shows immediately
+          PaintingBinding.instance.imageCache.clear();
           ScaffoldMessenger.of(context).showSnackBar(
-            SnackBar(
-              content: const Text('Profile updated successfully!'),
-              backgroundColor: Colors.yellow[800],
-            ),
-          );
+            SnackBar(content: const Text('Profile updated successfully!'), backgroundColor: Colors.yellow[800]));
           Navigator.pop(context);
         } else {
           ScaffoldMessenger.of(context).showSnackBar(
-            SnackBar(
-              content: Text(authProvider.errorMessage ?? 'Update failed!'),
-              backgroundColor: Colors.grey[800],
-            ),
-          );
+            SnackBar(content: Text(authProvider.errorMessage ?? 'Update failed!'), backgroundColor: Colors.grey[800]));
         }
       }
     }
   }
 
   Widget _buildProfileImage(dynamic user) {
-    if (_webImage != null) {
-      return ClipOval(child: Image.memory(_webImage!, width: 88, height: 88, fit: BoxFit.cover));
-    } else if (_selectedImage != null) {
-      return ClipOval(child: Image.file(_selectedImage!, width: 88, height: 88, fit: BoxFit.cover));
-    } else if (user?.profilePhoto != null) {
+    if (_webImage != null) return ClipOval(child: Image.memory(_webImage!, width: 88, height: 88, fit: BoxFit.cover));
+    if (_selectedImage != null) return ClipOval(child: Image.file(_selectedImage!, width: 88, height: 88, fit: BoxFit.cover));
+    if (user?.profilePhoto != null) {
       return ClipOval(
         child: Image.network(
-          user!.profilePhoto!,
+          '${user!.profilePhoto!}?t=${DateTime.now().millisecondsSinceEpoch}',
           width: 88, height: 88, fit: BoxFit.cover,
           errorBuilder: (_, __, ___) => const Icon(Icons.person, size: 44, color: Colors.white),
         ),
@@ -144,12 +113,10 @@ class _EditProfileScreenState extends State<EditProfileScreen>
 
   InputDecoration _fieldDecoration(String label, IconData icon, {String? helper, bool enabled = true}) {
     return InputDecoration(
-      labelText: label,
-      helperText: helper,
+      labelText: label, helperText: helper,
       labelStyle: TextStyle(color: enabled ? Colors.grey[600] : Colors.grey[400], fontSize: 14),
       prefixIcon: Icon(icon, color: enabled ? Colors.yellow[800] : Colors.grey[400], size: 20),
-      filled: true,
-      fillColor: enabled ? Colors.white : Colors.grey[50],
+      filled: true, fillColor: enabled ? Colors.white : Colors.grey[50],
       contentPadding: const EdgeInsets.symmetric(horizontal: 16, vertical: 16),
       border: OutlineInputBorder(borderRadius: BorderRadius.circular(14), borderSide: BorderSide(color: Colors.grey.shade200)),
       enabledBorder: OutlineInputBorder(borderRadius: BorderRadius.circular(14), borderSide: BorderSide(color: Colors.grey.shade200)),
@@ -167,9 +134,7 @@ class _EditProfileScreenState extends State<EditProfileScreen>
     return Scaffold(
       backgroundColor: const Color(0xFFF4F4F6),
       appBar: AppBar(
-        backgroundColor: Colors.white,
-        elevation: 0,
-        centerTitle: true,
+        backgroundColor: Colors.white, elevation: 0, centerTitle: true,
         leading: IconButton(
           icon: Container(
             padding: const EdgeInsets.all(6),
@@ -217,11 +182,9 @@ class _EditProfileScreenState extends State<EditProfileScreen>
                       Text('Tap the icon to change photo', style: TextStyle(color: Colors.grey[400], fontSize: 12)),
                     ]),
                   ),
-
                   const SizedBox(height: 20),
                   const Text('Personal Information', style: TextStyle(fontSize: 15, fontWeight: FontWeight.w700, color: Colors.black87, letterSpacing: 0.1)),
                   const SizedBox(height: 12),
-
                   TextFormField(
                     controller: _nameController,
                     style: const TextStyle(color: Colors.black87, fontSize: 15),
@@ -229,7 +192,6 @@ class _EditProfileScreenState extends State<EditProfileScreen>
                     validator: (v) => (v == null || v.isEmpty) ? 'Please enter your name' : null,
                   ),
                   const SizedBox(height: 12),
-
                   TextFormField(
                     controller: _phoneController,
                     keyboardType: TextInputType.phone,
@@ -238,8 +200,6 @@ class _EditProfileScreenState extends State<EditProfileScreen>
                     validator: (v) => (v == null || v.isEmpty) ? 'Please enter your phone number' : null,
                   ),
                   const SizedBox(height: 12),
-
-                  // ✅ Email now editable
                   TextFormField(
                     controller: _emailController,
                     keyboardType: TextInputType.emailAddress,
@@ -251,9 +211,7 @@ class _EditProfileScreenState extends State<EditProfileScreen>
                       return null;
                     },
                   ),
-
                   const SizedBox(height: 32),
-
                   _isLoading
                       ? Center(child: CircularProgressIndicator(valueColor: AlwaysStoppedAnimation<Color>(Colors.yellow[800]!)))
                       : SizedBox(
@@ -263,9 +221,7 @@ class _EditProfileScreenState extends State<EditProfileScreen>
                             icon: const Icon(Icons.check_circle_rounded, size: 20),
                             label: const Text('Save Changes', style: TextStyle(fontSize: 15, fontWeight: FontWeight.w600)),
                             style: ElevatedButton.styleFrom(
-                              backgroundColor: Colors.yellow[800],
-                              foregroundColor: Colors.white,
-                              elevation: 0,
+                              backgroundColor: Colors.yellow[800], foregroundColor: Colors.white, elevation: 0,
                               shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(16)),
                             ),
                           ),

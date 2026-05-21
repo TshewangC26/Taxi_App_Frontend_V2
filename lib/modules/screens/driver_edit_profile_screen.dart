@@ -19,7 +19,7 @@ class _DriverEditProfileScreenState extends State<DriverEditProfileScreen>
 
   final _nameController  = TextEditingController();
   final _phoneController = TextEditingController();
-  final _emailController = TextEditingController(); // ✅ Added
+  final _emailController = TextEditingController();
 
   File?      _selectedImage;
   Uint8List? _webImage;
@@ -46,7 +46,7 @@ class _DriverEditProfileScreenState extends State<DriverEditProfileScreen>
       if (user != null) {
         _nameController.text  = user.name;
         _phoneController.text = user.phone ?? '';
-        _emailController.text = user.email ?? ''; // ✅ Added
+        _emailController.text = user.email ?? '';
       }
     });
   }
@@ -56,7 +56,7 @@ class _DriverEditProfileScreenState extends State<DriverEditProfileScreen>
     _animController.dispose();
     _nameController.dispose();
     _phoneController.dispose();
-    _emailController.dispose(); // ✅ Added
+    _emailController.dispose();
     super.dispose();
   }
 
@@ -80,7 +80,7 @@ class _DriverEditProfileScreenState extends State<DriverEditProfileScreen>
     final success = await authProvider.updateProfile(
       name:      _nameController.text.trim(),
       phone:     _phoneController.text.trim(),
-      email:     _emailController.text.trim(), // ✅ Added
+      email:     _emailController.text.trim(),
       imagePath: _imagePath,
     );
 
@@ -88,10 +88,14 @@ class _DriverEditProfileScreenState extends State<DriverEditProfileScreen>
     if (!mounted) return;
 
     if (success) {
-      ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: const Text('Profile updated successfully!'), backgroundColor: Colors.yellow[800]));
+      // ✅ Clear image cache so new photo shows immediately
+      PaintingBinding.instance.imageCache.clear();
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(content: const Text('Profile updated successfully!'), backgroundColor: Colors.yellow[800]));
       Navigator.pop(context);
     } else {
-      ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text(authProvider.errorMessage ?? 'Failed to update profile'), backgroundColor: Colors.grey[800]));
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(content: Text(authProvider.errorMessage ?? 'Failed to update profile'), backgroundColor: Colors.grey[800]));
     }
   }
 
@@ -172,11 +176,9 @@ class _DriverEditProfileScreenState extends State<DriverEditProfileScreen>
                             Text('Tap the icon to change photo', style: TextStyle(color: Colors.grey[400], fontSize: 12)),
                           ]),
                         ),
-
                         const SizedBox(height: 20),
                         _sectionLabel('Personal Information', Icons.person_outline_rounded),
                         const SizedBox(height: 12),
-
                         TextFormField(
                           controller: _nameController,
                           style: const TextStyle(color: Colors.black87, fontSize: 15),
@@ -184,7 +186,6 @@ class _DriverEditProfileScreenState extends State<DriverEditProfileScreen>
                           validator: (v) => (v == null || v.isEmpty) ? 'Please enter your name' : null,
                         ),
                         const SizedBox(height: 12),
-
                         TextFormField(
                           controller: _phoneController,
                           keyboardType: TextInputType.phone,
@@ -193,8 +194,6 @@ class _DriverEditProfileScreenState extends State<DriverEditProfileScreen>
                           validator: (v) => (v == null || v.isEmpty) ? 'Please enter your phone number' : null,
                         ),
                         const SizedBox(height: 12),
-
-                        // ✅ Email now editable
                         TextFormField(
                           controller: _emailController,
                           keyboardType: TextInputType.emailAddress,
@@ -206,9 +205,7 @@ class _DriverEditProfileScreenState extends State<DriverEditProfileScreen>
                             return null;
                           },
                         ),
-
                         const SizedBox(height: 32),
-
                         _isLoading
                             ? Center(child: CircularProgressIndicator(valueColor: AlwaysStoppedAnimation<Color>(Colors.yellow[800]!)))
                             : SizedBox(

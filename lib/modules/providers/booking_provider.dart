@@ -100,14 +100,17 @@ class BookingProvider with ChangeNotifier {
     }
   }
 
-  // Cancel booking
-  Future<bool> cancelBooking(int bookingId) async {
+  // Cancel booking — now accepts an optional cancellation reason
+  Future<bool> cancelBooking(int bookingId, {String? reason}) async {
     _isLoading = true;
     _errorMessage = null;
     notifyListeners();
 
     try {
-      await _apiService.post('/bookings/$bookingId/cancel', {});
+      await _apiService.post('/bookings/$bookingId/cancel', {
+        if (reason != null && reason.isNotEmpty)
+          'cancellation_reason': reason,
+      });
       await getPassengerBookings();
       return true;
     } catch (e) {
@@ -118,11 +121,10 @@ class BookingProvider with ChangeNotifier {
     }
   }
 
-  // ✅ Delete a completed or cancelled booking permanently
+  // Delete a completed or cancelled booking permanently
   Future<void> deleteBooking(int bookingId) async {
     try {
       await _apiService.delete('/bookings/$bookingId');
-      // Remove from local list immediately
       _bookings.removeWhere((b) => b.id == bookingId);
       notifyListeners();
     } catch (e) {

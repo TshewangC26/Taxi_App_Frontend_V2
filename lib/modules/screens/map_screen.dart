@@ -6,8 +6,8 @@ import 'package:firebase_database/firebase_database.dart';
 
 class MapScreen extends StatefulWidget {
   final String title;
-  final int? driverFirebaseId; // Firebase driver ID to track
-  final bool showNearbyDrivers; // Show all nearby drivers
+  final int? driverFirebaseId;
+  final bool showNearbyDrivers;
 
   const MapScreen({
     super.key,
@@ -25,10 +25,7 @@ class _MapScreenState extends State<MapScreen> {
   Position? _currentPosition;
   bool _isLoading = true;
 
-  // Markers on map
   final Map<MarkerId, Marker> _markers = {};
-
-  // Firebase subscription
   StreamSubscription? _driversSubscription;
 
   @override
@@ -44,18 +41,15 @@ class _MapScreenState extends State<MapScreen> {
     super.dispose();
   }
 
-  // Get current GPS location
   Future<void> _getCurrentLocation() async {
     try {
-      bool serviceEnabled =
-          await Geolocator.isLocationServiceEnabled();
+      bool serviceEnabled = await Geolocator.isLocationServiceEnabled();
       if (!serviceEnabled) {
         setState(() => _isLoading = false);
         return;
       }
 
-      LocationPermission permission =
-          await Geolocator.checkPermission();
+      LocationPermission permission = await Geolocator.checkPermission();
       if (permission == LocationPermission.denied) {
         permission = await Geolocator.requestPermission();
         if (permission == LocationPermission.denied) {
@@ -73,10 +67,8 @@ class _MapScreenState extends State<MapScreen> {
         _isLoading = false;
       });
 
-      // Add my location marker
       _addMyLocationMarker(position);
 
-      // Move camera to my location
       _mapController?.animateCamera(
         CameraUpdate.newLatLngZoom(
           LatLng(position.latitude, position.longitude),
@@ -84,30 +76,23 @@ class _MapScreenState extends State<MapScreen> {
         ),
       );
 
-      // Start listening to drivers
       _listenToDrivers();
     } catch (e) {
       setState(() => _isLoading = false);
     }
   }
 
-  // Add current user location marker
   void _addMyLocationMarker(Position position) {
     final markerId = const MarkerId('my_location');
     final marker = Marker(
       markerId: markerId,
       position: LatLng(position.latitude, position.longitude),
       infoWindow: const InfoWindow(title: 'My Location'),
-      icon: BitmapDescriptor.defaultMarkerWithHue(
-          BitmapDescriptor.hueBlue),
+      icon: BitmapDescriptor.defaultMarkerWithHue(BitmapDescriptor.hueBlue),
     );
-
-    setState(() {
-      _markers[markerId] = marker;
-    });
+    setState(() => _markers[markerId] = marker);
   }
 
-  // Listen to drivers from Firebase
   void _listenToDrivers() {
     _driversSubscription?.cancel();
 
@@ -122,9 +107,7 @@ class _MapScreenState extends State<MapScreen> {
 
       final driversMap = Map<String, dynamic>.from(data as Map);
 
-      // Remove old driver markers
-      _markers.removeWhere(
-          (key, value) => key.value.startsWith('driver_'));
+      _markers.removeWhere((key, value) => key.value.startsWith('driver_'));
 
       driversMap.forEach((key, value) {
         final driver = Map<String, dynamic>.from(value as Map);
@@ -132,19 +115,16 @@ class _MapScreenState extends State<MapScreen> {
             double.tryParse(driver['latitude'].toString()) ?? 0;
         final driverLng =
             double.tryParse(driver['longitude'].toString()) ?? 0;
-        final status     = driver['status'] ?? 'offline';
+        final status = driver['status'] ?? 'offline';
         final driverName = driver['driver_name'] ?? 'Driver';
-        final driverId   = int.tryParse(key) ?? 0;
+        final driverId = int.tryParse(key) ?? 0;
 
-        // If tracking specific driver
         if (widget.driverFirebaseId != null) {
           if (driverId != widget.driverFirebaseId) return;
         } else {
-          // Show only available drivers
           if (!widget.showNearbyDrivers) return;
           if (status != 'available') return;
 
-          // Only show within 3km
           if (_currentPosition != null) {
             final distance = Geolocator.distanceBetween(
                   _currentPosition!.latitude,
@@ -163,9 +143,8 @@ class _MapScreenState extends State<MapScreen> {
           position: LatLng(driverLat, driverLng),
           infoWindow: InfoWindow(
             title: driverName,
-            snippet: status == 'available'
-                ? '🟢 Available'
-                : '🟡 On a ride',
+            snippet:
+                status == 'available' ? '🟢 Available' : '🟡 On a ride',
           ),
           icon: BitmapDescriptor.defaultMarkerWithHue(
             status == 'available'
@@ -174,16 +153,12 @@ class _MapScreenState extends State<MapScreen> {
           ),
         );
 
-        setState(() {
-          _markers[markerId] = marker;
-        });
+        setState(() => _markers[markerId] = marker);
 
-        // If tracking specific driver, follow them
         if (widget.driverFirebaseId != null &&
             driverId == widget.driverFirebaseId) {
           _mapController?.animateCamera(
-            CameraUpdate.newLatLng(
-                LatLng(driverLat, driverLng)),
+            CameraUpdate.newLatLng(LatLng(driverLat, driverLng)),
           );
         }
       });
@@ -221,8 +196,7 @@ class _MapScreenState extends State<MapScreen> {
                   child: Column(
                     mainAxisAlignment: MainAxisAlignment.center,
                     children: [
-                      Icon(Icons.location_off,
-                          size: 64, color: Colors.grey),
+                      Icon(Icons.location_off, size: 64, color: Colors.grey),
                       SizedBox(height: 16),
                       Text('Could not get location',
                           style: TextStyle(color: Colors.grey)),
@@ -231,6 +205,7 @@ class _MapScreenState extends State<MapScreen> {
                 )
               : Stack(
                   children: [
+                    // ── Google Map ──────────────────────────
                     GoogleMap(
                       initialCameraPosition: CameraPosition(
                         target: LatLng(
@@ -245,11 +220,15 @@ class _MapScreenState extends State<MapScreen> {
                       markers: Set<Marker>.of(_markers.values),
                       myLocationEnabled: true,
                       myLocationButtonEnabled: false,
-                      zoomControlsEnabled: true,
+                      zoomControlsEnabled: false,
                       mapToolbarEnabled: false,
+                      zoomGesturesEnabled: true,
+                      scrollGesturesEnabled: true,
+                      rotateGesturesEnabled: true,
+                      tiltGesturesEnabled: true,
                     ),
 
-                    // Legend
+                    // ── Legend (bottom left) ─────────────────
                     Positioned(
                       bottom: 16,
                       left: 16,
@@ -266,15 +245,13 @@ class _MapScreenState extends State<MapScreen> {
                           ],
                         ),
                         child: Column(
-                          crossAxisAlignment:
-                              CrossAxisAlignment.start,
+                          crossAxisAlignment: CrossAxisAlignment.start,
                           mainAxisSize: MainAxisSize.min,
                           children: [
                             Row(
                               children: [
                                 Container(
-                                  width: 12,
-                                  height: 12,
+                                  width: 12, height: 12,
                                   decoration: const BoxDecoration(
                                     color: Colors.blue,
                                     shape: BoxShape.circle,
@@ -282,16 +259,14 @@ class _MapScreenState extends State<MapScreen> {
                                 ),
                                 const SizedBox(width: 8),
                                 const Text('My Location',
-                                    style:
-                                        TextStyle(fontSize: 12)),
+                                    style: TextStyle(fontSize: 12)),
                               ],
                             ),
                             const SizedBox(height: 4),
                             Row(
                               children: [
                                 Container(
-                                  width: 12,
-                                  height: 12,
+                                  width: 12, height: 12,
                                   decoration: const BoxDecoration(
                                     color: Colors.green,
                                     shape: BoxShape.circle,
@@ -299,16 +274,14 @@ class _MapScreenState extends State<MapScreen> {
                                 ),
                                 const SizedBox(width: 8),
                                 const Text('Available Driver',
-                                    style:
-                                        TextStyle(fontSize: 12)),
+                                    style: TextStyle(fontSize: 12)),
                               ],
                             ),
                             const SizedBox(height: 4),
                             Row(
                               children: [
                                 Container(
-                                  width: 12,
-                                  height: 12,
+                                  width: 12, height: 12,
                                   decoration: const BoxDecoration(
                                     color: Colors.orange,
                                     shape: BoxShape.circle,
@@ -316,8 +289,7 @@ class _MapScreenState extends State<MapScreen> {
                                 ),
                                 const SizedBox(width: 8),
                                 const Text('Driver on ride',
-                                    style:
-                                        TextStyle(fontSize: 12)),
+                                    style: TextStyle(fontSize: 12)),
                               ],
                             ),
                           ],
