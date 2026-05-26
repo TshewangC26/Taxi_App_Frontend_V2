@@ -1,10 +1,74 @@
 import 'package:flutter/material.dart';
+import 'package:flutter/services.dart';
 import 'package:provider/provider.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 import '../providers/auth_provider.dart';
 import '../services/api_service.dart';
 import 'passenger_home_screen.dart';
 import 'driver_home_screen.dart';
+
+// ✅ Auto-formatter for License Number: G-13947
+class LicenseNumberFormatter extends TextInputFormatter {
+  @override
+  TextEditingValue formatEditUpdate(
+      TextEditingValue oldValue, TextEditingValue newValue) {
+    // Strip all dashes, uppercase
+    String raw = newValue.text.replaceAll('-', '').toUpperCase();
+
+    String formatted = '';
+
+    for (int i = 0; i < raw.length; i++) {
+      if (i == 1 && raw.length > 1) {
+        // After first letter, insert dash before numbers
+        formatted += '-';
+      }
+      formatted += raw[i];
+    }
+
+    // Limit: 1 letter + dash + up to 5 digits = 7 chars displayed
+    if (formatted.length > 7) {
+      formatted = formatted.substring(0, 7);
+    }
+
+    return TextEditingValue(
+      text: formatted,
+      selection: TextSelection.collapsed(offset: formatted.length),
+    );
+  }
+}
+
+// ✅ Auto-formatter for Vehicle Number: BP-1-B6884
+class VehicleNumberFormatter extends TextInputFormatter {
+  @override
+  TextEditingValue formatEditUpdate(
+      TextEditingValue oldValue, TextEditingValue newValue) {
+    // Strip all dashes, uppercase
+    String raw = newValue.text.replaceAll('-', '').toUpperCase();
+
+    String formatted = '';
+
+    for (int i = 0; i < raw.length; i++) {
+      if (i == 2 && raw.length > 2) {
+        // After 2 letters (BP), insert first dash
+        formatted += '-';
+      } else if (i == 3 && raw.length > 3) {
+        // After 1 digit (1), insert second dash
+        formatted += '-';
+      }
+      formatted += raw[i];
+    }
+
+    // Limit: BP-1-B6884 = 2+1+1+1+1+4 chars + 2 dashes = 10 chars displayed
+    if (formatted.length > 10) {
+      formatted = formatted.substring(0, 10);
+    }
+
+    return TextEditingValue(
+      text: formatted,
+      selection: TextSelection.collapsed(offset: formatted.length),
+    );
+  }
+}
 
 class RegisterScreen extends StatefulWidget {
   const RegisterScreen({super.key});
@@ -227,12 +291,14 @@ class _RegisterScreenState extends State<RegisterScreen>
     bool obscure = false,
     TextInputType keyboardType = TextInputType.text,
     Widget? suffixIcon,
+    List<TextInputFormatter>? inputFormatters,
     String? Function(String?)? validator,
   }) {
     return TextFormField(
       controller: controller,
       obscureText: obscure,
       keyboardType: keyboardType,
+      inputFormatters: inputFormatters,
       style: const TextStyle(color: Colors.black87, fontSize: 15),
       decoration: InputDecoration(
         labelText: label,
@@ -446,17 +512,27 @@ class _RegisterScreenState extends State<RegisterScreen>
                     ),
                     const SizedBox(height: 14),
 
+                    // ✅ Vehicle Number with auto-formatter: BP-1-B6884
                     _buildField(
-                      controller: _vehicleNumberController, label: 'Vehicle Number',
-                      icon: Icons.confirmation_number_outlined, hint: 'Example: BT-1234',
+                      controller: _vehicleNumberController,
+                      label: 'Vehicle Number',
+                      icon: Icons.confirmation_number_outlined,
+                      hint: 'e.g. BP1B6884 → BP-1-B6884',
+                      keyboardType: TextInputType.text,
+                      inputFormatters: [VehicleNumberFormatter()],
                       validator: (value) => (_userType == 'driver' && (value == null || value.isEmpty))
                           ? 'Please enter vehicle number' : null,
                     ),
                     const SizedBox(height: 14),
 
+                    // ✅ License Number with auto-formatter: G-13947
                     _buildField(
-                      controller: _licenseNumberController, label: 'License Number',
-                      icon: Icons.card_membership_outlined, hint: 'Your driver license ID',
+                      controller: _licenseNumberController,
+                      label: 'License Number',
+                      icon: Icons.card_membership_outlined,
+                      hint: 'e.g. G13947 → G-13947',
+                      keyboardType: TextInputType.text,
+                      inputFormatters: [LicenseNumberFormatter()],
                       validator: (value) => (_userType == 'driver' && (value == null || value.isEmpty))
                           ? 'Please enter license number' : null,
                     ),
