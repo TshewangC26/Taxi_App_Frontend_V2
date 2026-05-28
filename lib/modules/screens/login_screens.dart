@@ -24,6 +24,7 @@ class _LoginScreenState extends State<LoginScreen> {
   final _nameController = TextEditingController();
   final _passwordController = TextEditingController();
   bool _showPassword = false;
+  String _selectedRole = 'passenger'; // ✅ default role
 
   @override
   void initState() {
@@ -78,7 +79,6 @@ class _LoginScreenState extends State<LoginScreen> {
         child: Column(
           mainAxisSize: MainAxisSize.min,
           children: [
-            // Handle
             Container(
               width: 40, height: 4,
               decoration: BoxDecoration(
@@ -203,6 +203,7 @@ class _LoginScreenState extends State<LoginScreen> {
       final success = await authProvider.login(
         _nameController.text.trim(),
         _passwordController.text,
+        userType: _selectedRole, // ✅ pass selected role
         fcmToken: fcmToken,
       );
 
@@ -316,7 +317,6 @@ class _LoginScreenState extends State<LoginScreen> {
         iconTheme: const IconThemeData(color: Colors.black),
         automaticallyImplyLeading: false,
         actions: [
-          // ── Info icon → Contact Us / About Us ──────────
           Padding(
             padding: const EdgeInsets.only(right: 12),
             child: InkWell(
@@ -373,6 +373,95 @@ class _LoginScreenState extends State<LoginScreen> {
                 ),
 
                 const SizedBox(height: 30),
+
+                // ✅ Role Toggle
+                Container(
+                  decoration: BoxDecoration(
+                    color: Colors.grey[100],
+                    borderRadius: BorderRadius.circular(12),
+                    border: Border.all(color: Colors.grey.shade200),
+                  ),
+                  child: Row(
+                    children: [
+                      Expanded(
+                        child: GestureDetector(
+                          onTap: () => setState(() => _selectedRole = 'passenger'),
+                          child: Container(
+                            padding: const EdgeInsets.symmetric(vertical: 12),
+                            decoration: BoxDecoration(
+                              color: _selectedRole == 'passenger'
+                                  ? Colors.yellow[800]
+                                  : Colors.transparent,
+                              borderRadius: BorderRadius.circular(10),
+                            ),
+                            child: Row(
+                              mainAxisAlignment: MainAxisAlignment.center,
+                              children: [
+                                Icon(
+                                  Icons.person_rounded,
+                                  size: 18,
+                                  color: _selectedRole == 'passenger'
+                                      ? Colors.white
+                                      : Colors.grey[600],
+                                ),
+                                const SizedBox(width: 6),
+                                Text(
+                                  'Passenger',
+                                  style: TextStyle(
+                                    fontSize: 14,
+                                    fontWeight: FontWeight.w600,
+                                    color: _selectedRole == 'passenger'
+                                        ? Colors.white
+                                        : Colors.grey[600],
+                                  ),
+                                ),
+                              ],
+                            ),
+                          ),
+                        ),
+                      ),
+                      Expanded(
+                        child: GestureDetector(
+                          onTap: () => setState(() => _selectedRole = 'driver'),
+                          child: Container(
+                            padding: const EdgeInsets.symmetric(vertical: 12),
+                            decoration: BoxDecoration(
+                              color: _selectedRole == 'driver'
+                                  ? Colors.yellow[800]
+                                  : Colors.transparent,
+                              borderRadius: BorderRadius.circular(10),
+                            ),
+                            child: Row(
+                              mainAxisAlignment: MainAxisAlignment.center,
+                              children: [
+                                Icon(
+                                  Icons.drive_eta_rounded,
+                                  size: 18,
+                                  color: _selectedRole == 'driver'
+                                      ? Colors.white
+                                      : Colors.grey[600],
+                                ),
+                                const SizedBox(width: 6),
+                                Text(
+                                  'Driver',
+                                  style: TextStyle(
+                                    fontSize: 14,
+                                    fontWeight: FontWeight.w600,
+                                    color: _selectedRole == 'driver'
+                                        ? Colors.white
+                                        : Colors.grey[600],
+                                  ),
+                                ),
+                              ],
+                            ),
+                          ),
+                        ),
+                      ),
+                    ],
+                  ),
+                ),
+
+                const SizedBox(height: 16),
 
                 TextFormField(
                   controller: _nameController,

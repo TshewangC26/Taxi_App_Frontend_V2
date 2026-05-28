@@ -15,6 +15,7 @@ class _ForgotPasswordScreenState extends State<ForgotPasswordScreen>
   final _formKey = GlobalKey<FormState>();
   final _emailController = TextEditingController();
   bool _isLoading = false;
+  String _selectedRole = 'passenger'; // ✅ default role
 
   late AnimationController _animController;
   late Animation<double> _fadeAnim;
@@ -71,7 +72,6 @@ class _ForgotPasswordScreenState extends State<ForgotPasswordScreen>
           child: Column(
             mainAxisSize: MainAxisSize.min,
             children: [
-              // Icon
               Stack(alignment: Alignment.center, children: [
                 Container(
                     width: 80, height: 80,
@@ -138,6 +138,7 @@ class _ForgotPasswordScreenState extends State<ForgotPasswordScreen>
 
       final success = await authProvider.forgotPassword(
         email: _emailController.text.trim(),
+        userType: _selectedRole, // ✅ pass selected role
       );
 
       setState(() => _isLoading = false);
@@ -156,11 +157,11 @@ class _ForgotPasswordScreenState extends State<ForgotPasswordScreen>
               builder: (context) => ResetPasswordScreen(
                 email: _emailController.text.trim(),
                 userName: authProvider.resetUserName,
+                userType: _selectedRole, // ✅ pass role to reset screen
               ),
             ),
           );
         } else {
-          // Show styled dialog for unregistered email
           _showEmailNotFoundDialog();
         }
       }
@@ -247,7 +248,7 @@ class _ForgotPasswordScreenState extends State<ForgotPasswordScreen>
                         const Padding(
                           padding: EdgeInsets.symmetric(horizontal: 24),
                           child: Text(
-                            'Enter your email and we\'ll send you a reset code',
+                            'Select your role and enter your email\nto receive a reset code',
                             textAlign: TextAlign.center,
                             style: TextStyle(
                               color: Colors.white70,
@@ -261,6 +262,118 @@ class _ForgotPasswordScreenState extends State<ForgotPasswordScreen>
                   ),
 
                   const SizedBox(height: 32),
+
+                  // ✅ Role Toggle
+                  Row(children: [
+                    Container(
+                      padding: const EdgeInsets.all(8),
+                      decoration: BoxDecoration(
+                        color: Colors.yellow[800],
+                        borderRadius: BorderRadius.circular(10),
+                      ),
+                      child: const Icon(Icons.switch_account_outlined,
+                          color: Colors.white, size: 16),
+                    ),
+                    const SizedBox(width: 10),
+                    const Text(
+                      'Account Type',
+                      style: TextStyle(
+                        fontSize: 16,
+                        fontWeight: FontWeight.w600,
+                        color: Colors.black87,
+                        letterSpacing: 0.3,
+                      ),
+                    ),
+                  ]),
+                  const SizedBox(height: 14),
+
+                  Container(
+                    decoration: BoxDecoration(
+                      color: Colors.grey[100],
+                      borderRadius: BorderRadius.circular(12),
+                      border: Border.all(color: Colors.grey.shade200),
+                    ),
+                    child: Row(
+                      children: [
+                        Expanded(
+                          child: GestureDetector(
+                            onTap: () => setState(() => _selectedRole = 'passenger'),
+                            child: Container(
+                              padding: const EdgeInsets.symmetric(vertical: 12),
+                              decoration: BoxDecoration(
+                                color: _selectedRole == 'passenger'
+                                    ? Colors.yellow[800]
+                                    : Colors.transparent,
+                                borderRadius: BorderRadius.circular(10),
+                              ),
+                              child: Row(
+                                mainAxisAlignment: MainAxisAlignment.center,
+                                children: [
+                                  Icon(
+                                    Icons.person_rounded,
+                                    size: 18,
+                                    color: _selectedRole == 'passenger'
+                                        ? Colors.white
+                                        : Colors.grey[600],
+                                  ),
+                                  const SizedBox(width: 6),
+                                  Text(
+                                    'Passenger',
+                                    style: TextStyle(
+                                      fontSize: 14,
+                                      fontWeight: FontWeight.w600,
+                                      color: _selectedRole == 'passenger'
+                                          ? Colors.white
+                                          : Colors.grey[600],
+                                    ),
+                                  ),
+                                ],
+                              ),
+                            ),
+                          ),
+                        ),
+                        Expanded(
+                          child: GestureDetector(
+                            onTap: () => setState(() => _selectedRole = 'driver'),
+                            child: Container(
+                              padding: const EdgeInsets.symmetric(vertical: 12),
+                              decoration: BoxDecoration(
+                                color: _selectedRole == 'driver'
+                                    ? Colors.yellow[800]
+                                    : Colors.transparent,
+                                borderRadius: BorderRadius.circular(10),
+                              ),
+                              child: Row(
+                                mainAxisAlignment: MainAxisAlignment.center,
+                                children: [
+                                  Icon(
+                                    Icons.drive_eta_rounded,
+                                    size: 18,
+                                    color: _selectedRole == 'driver'
+                                        ? Colors.white
+                                        : Colors.grey[600],
+                                  ),
+                                  const SizedBox(width: 6),
+                                  Text(
+                                    'Driver',
+                                    style: TextStyle(
+                                      fontSize: 14,
+                                      fontWeight: FontWeight.w600,
+                                      color: _selectedRole == 'driver'
+                                          ? Colors.white
+                                          : Colors.grey[600],
+                                    ),
+                                  ),
+                                ],
+                              ),
+                            ),
+                          ),
+                        ),
+                      ],
+                    ),
+                  ),
+
+                  const SizedBox(height: 24),
 
                   // ── Step label ──────────────────────────────
                   Row(

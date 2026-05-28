@@ -60,6 +60,7 @@ class AuthProvider with ChangeNotifier {
   Future<bool> login(
     String name,
     String password, {
+    required String userType,
     String? fcmToken,
   }) async {
     _isLoading    = true;
@@ -70,6 +71,7 @@ class AuthProvider with ChangeNotifier {
       final response = await _apiService.post('/login', {
         'name':      name,
         'password':  password,
+        'user_type': userType,
         if (fcmToken != null) 'fcm_token': fcmToken,
       });
 
@@ -167,14 +169,18 @@ class AuthProvider with ChangeNotifier {
     }
   }
 
-  Future<bool> forgotPassword({required String email}) async {
+  Future<bool> forgotPassword({
+    required String email,
+    required String userType, // ✅ added userType
+  }) async {
     _isLoading    = true;
     _errorMessage = null;
     notifyListeners();
 
     try {
       final response = await _apiService.post('/forgot-password', {
-        'email': email,
+        'email':     email,
+        'user_type': userType, // ✅ send userType to backend
       });
 
       _resetUserName = response['userName'];
