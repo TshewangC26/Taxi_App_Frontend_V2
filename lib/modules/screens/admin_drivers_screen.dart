@@ -373,13 +373,10 @@ class _AdminDriversScreenState extends State<AdminDriversScreen>
                       child: OutlinedButton(
                         onPressed: () => Navigator.pop(ctx),
                         style: OutlinedButton.styleFrom(
-                          padding: const EdgeInsets.symmetric(
-                              vertical: 13),
-                          side:
-                              BorderSide(color: Colors.grey.shade300),
+                          padding: const EdgeInsets.symmetric(vertical: 13),
+                          side: BorderSide(color: Colors.grey.shade300),
                           shape: RoundedRectangleBorder(
-                              borderRadius:
-                                  BorderRadius.circular(12)),
+                              borderRadius: BorderRadius.circular(12)),
                           foregroundColor: Colors.black54,
                         ),
                         child: const Text('Cancel',
@@ -399,8 +396,7 @@ class _AdminDriversScreenState extends State<AdminDriversScreen>
                               licenseCtrl.text.isEmpty) {
                             ScaffoldMessenger.of(context)
                                 .showSnackBar(SnackBar(
-                              content:
-                                  const Text('Please fill all fields'),
+                              content: const Text('Please fill all fields'),
                               backgroundColor: Colors.grey[800],
                             ));
                             return;
@@ -420,8 +416,7 @@ class _AdminDriversScreenState extends State<AdminDriversScreen>
                             if (context.mounted) {
                               ScaffoldMessenger.of(context)
                                   .showSnackBar(SnackBar(
-                                content:
-                                    const Text('Driver added!'),
+                                content: const Text('Driver added!'),
                                 backgroundColor: Colors.yellow[800],
                               ));
                             }
@@ -439,11 +434,9 @@ class _AdminDriversScreenState extends State<AdminDriversScreen>
                           backgroundColor: Colors.yellow[800],
                           foregroundColor: Colors.white,
                           elevation: 0,
-                          padding: const EdgeInsets.symmetric(
-                              vertical: 13),
+                          padding: const EdgeInsets.symmetric(vertical: 13),
                           shape: RoundedRectangleBorder(
-                              borderRadius:
-                                  BorderRadius.circular(12)),
+                              borderRadius: BorderRadius.circular(12)),
                         ),
                         child: const Text('Add Driver',
                             style: TextStyle(fontSize: 14,
@@ -462,14 +455,10 @@ class _AdminDriversScreenState extends State<AdminDriversScreen>
 
   // ── Edit driver dialog ────────────────────────────────────────
   void _showEditDriverDialog(dynamic driver) {
-    final nameCtrl =
-        TextEditingController(text: driver['name'] ?? '');
-    final phoneCtrl =
-        TextEditingController(text: driver['phone'] ?? '');
-    final vehicleNumCtrl =
-        TextEditingController(text: driver['vehicle_number'] ?? '');
-    final licenseCtrl =
-        TextEditingController(text: driver['license_number'] ?? '');
+    final nameCtrl = TextEditingController(text: driver['name'] ?? '');
+    final phoneCtrl = TextEditingController(text: driver['phone'] ?? '');
+    final vehicleNumCtrl = TextEditingController(text: driver['vehicle_number'] ?? '');
+    final licenseCtrl = TextEditingController(text: driver['license_number'] ?? '');
     String vehicleType = driver['vehicle_type'] ?? '4-seater';
 
     showDialog(
@@ -526,13 +515,10 @@ class _AdminDriversScreenState extends State<AdminDriversScreen>
                       child: OutlinedButton(
                         onPressed: () => Navigator.pop(ctx),
                         style: OutlinedButton.styleFrom(
-                          padding: const EdgeInsets.symmetric(
-                              vertical: 13),
-                          side:
-                              BorderSide(color: Colors.grey.shade300),
+                          padding: const EdgeInsets.symmetric(vertical: 13),
+                          side: BorderSide(color: Colors.grey.shade300),
                           shape: RoundedRectangleBorder(
-                              borderRadius:
-                                  BorderRadius.circular(12)),
+                              borderRadius: BorderRadius.circular(12)),
                           foregroundColor: Colors.black54,
                         ),
                         child: const Text('Cancel',
@@ -558,8 +544,7 @@ class _AdminDriversScreenState extends State<AdminDriversScreen>
                             if (context.mounted) {
                               ScaffoldMessenger.of(context)
                                   .showSnackBar(SnackBar(
-                                content:
-                                    const Text('Driver updated!'),
+                                content: const Text('Driver updated!'),
                                 backgroundColor: Colors.yellow[800],
                               ));
                             }
@@ -577,11 +562,9 @@ class _AdminDriversScreenState extends State<AdminDriversScreen>
                           backgroundColor: Colors.yellow[800],
                           foregroundColor: Colors.white,
                           elevation: 0,
-                          padding: const EdgeInsets.symmetric(
-                              vertical: 13),
+                          padding: const EdgeInsets.symmetric(vertical: 13),
                           shape: RoundedRectangleBorder(
-                              borderRadius:
-                                  BorderRadius.circular(12)),
+                              borderRadius: BorderRadius.circular(12)),
                         ),
                         child: const Text('Update',
                             style: TextStyle(fontSize: 14,
@@ -639,10 +622,8 @@ class _AdminDriversScreenState extends State<AdminDriversScreen>
                   child: OutlinedButton(
                     onPressed: () => Navigator.of(ctx).pop(false),
                     style: OutlinedButton.styleFrom(
-                      padding: const EdgeInsets.symmetric(
-                          vertical: 13),
-                      side:
-                          BorderSide(color: Colors.grey.shade300),
+                      padding: const EdgeInsets.symmetric(vertical: 13),
+                      side: BorderSide(color: Colors.grey.shade300),
                       shape: RoundedRectangleBorder(
                           borderRadius: BorderRadius.circular(12)),
                       foregroundColor: Colors.black54,
@@ -660,8 +641,7 @@ class _AdminDriversScreenState extends State<AdminDriversScreen>
                       backgroundColor: Colors.red[400],
                       foregroundColor: Colors.white,
                       elevation: 0,
-                      padding: const EdgeInsets.symmetric(
-                          vertical: 13),
+                      padding: const EdgeInsets.symmetric(vertical: 13),
                       shape: RoundedRectangleBorder(
                           borderRadius: BorderRadius.circular(12)),
                     ),
@@ -723,12 +703,122 @@ class _AdminDriversScreenState extends State<AdminDriversScreen>
     }
   }
 
+  // ✅ Show license image dialog
+  void _showLicenseImageDialog(dynamic driver) {
+    showDialog(
+      context: context,
+      barrierColor: Colors.black.withOpacity(0.8),
+      builder: (ctx) => Dialog(
+        backgroundColor: Colors.transparent,
+        elevation: 0,
+        child: Container(
+          padding: const EdgeInsets.all(20),
+          decoration: BoxDecoration(
+            color: Colors.white,
+            borderRadius: BorderRadius.circular(24),
+          ),
+          child: Column(
+            mainAxisSize: MainAxisSize.min,
+            children: [
+              Row(children: [
+                Container(
+                  padding: const EdgeInsets.all(8),
+                  decoration: BoxDecoration(
+                    color: Colors.yellow[50],
+                    borderRadius: BorderRadius.circular(10),
+                  ),
+                  child: Icon(Icons.card_membership_outlined,
+                      color: Colors.yellow[800], size: 18),
+                ),
+                const SizedBox(width: 10),
+                Expanded(
+                  child: Column(
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    children: [
+                      Text(driver['name'] ?? '',
+                          style: const TextStyle(
+                              fontSize: 15,
+                              fontWeight: FontWeight.w700,
+                              color: Colors.black87)),
+                      Text('License: ${driver['license_number'] ?? 'N/A'}',
+                          style: TextStyle(
+                              fontSize: 12, color: Colors.grey[500])),
+                    ],
+                  ),
+                ),
+                IconButton(
+                  onPressed: () => Navigator.pop(ctx),
+                  icon: Icon(Icons.close_rounded,
+                      color: Colors.grey[400], size: 22),
+                ),
+              ]),
+              const SizedBox(height: 16),
+              ClipRRect(
+                borderRadius: BorderRadius.circular(14),
+                child: Image.network(
+                  driver['license_image'],
+                  fit: BoxFit.contain,
+                  loadingBuilder: (context, child, loadingProgress) {
+                    if (loadingProgress == null) return child;
+                    return SizedBox(
+                      height: 200,
+                      child: Center(
+                        child: CircularProgressIndicator(
+                          valueColor: AlwaysStoppedAnimation<Color>(
+                              Colors.yellow[800]!),
+                        ),
+                      ),
+                    );
+                  },
+                  errorBuilder: (context, error, stackTrace) => Container(
+                    height: 200,
+                    decoration: BoxDecoration(
+                      color: Colors.grey[100],
+                      borderRadius: BorderRadius.circular(14),
+                    ),
+                    child: Column(
+                      mainAxisAlignment: MainAxisAlignment.center,
+                      children: [
+                        Icon(Icons.broken_image_outlined,
+                            color: Colors.grey[400], size: 40),
+                        const SizedBox(height: 8),
+                        Text('Image not available',
+                            style: TextStyle(
+                                color: Colors.grey[400], fontSize: 13)),
+                      ],
+                    ),
+                  ),
+                ),
+              ),
+              const SizedBox(height: 16),
+              SizedBox(
+                width: double.infinity,
+                child: ElevatedButton(
+                  onPressed: () => Navigator.pop(ctx),
+                  style: ElevatedButton.styleFrom(
+                    backgroundColor: Colors.yellow[800],
+                    foregroundColor: Colors.white,
+                    elevation: 0,
+                    padding: const EdgeInsets.symmetric(vertical: 13),
+                    shape: RoundedRectangleBorder(
+                        borderRadius: BorderRadius.circular(14)),
+                  ),
+                  child: const Text('Close',
+                      style: TextStyle(
+                          fontSize: 15, fontWeight: FontWeight.w600)),
+                ),
+              ),
+            ],
+          ),
+        ),
+      ),
+    );
+  }
+
   @override
   Widget build(BuildContext context) {
     return Scaffold(
       backgroundColor: const Color(0xFFF4F4F6),
-
-      // ── APP BAR ──────────────────────────────────────────
       appBar: AppBar(
         backgroundColor: Colors.white,
         elevation: 0,
@@ -787,8 +877,6 @@ class _AdminDriversScreenState extends State<AdminDriversScreen>
           ),
         ],
       ),
-
-      // ── BOTTOM NAV ────────────────────────────────────────
       bottomNavigationBar: Container(
         decoration: BoxDecoration(
           color: Colors.white,
@@ -836,23 +924,17 @@ class _AdminDriversScreenState extends State<AdminDriversScreen>
           ],
         ),
       ),
-
-      // ── FAB ───────────────────────────────────────────────
       floatingActionButton: FloatingActionButton.extended(
         onPressed: _showAddDriverDialog,
         icon: const Icon(Icons.add_rounded),
         label: const Text('Add Driver',
-            style: TextStyle(
-                fontSize: 13, fontWeight: FontWeight.w600)),
+            style: TextStyle(fontSize: 13, fontWeight: FontWeight.w600)),
         backgroundColor: Colors.yellow[800],
         foregroundColor: Colors.white,
         elevation: 2,
       ),
-
-      // ── BODY ─────────────────────────────────────────────
       body: Column(
         children: [
-          // ── SEARCH BAR ─────────────────────────────────
           Container(
             color: Colors.white,
             padding: const EdgeInsets.fromLTRB(16, 10, 16, 12),
@@ -868,9 +950,7 @@ class _AdminDriversScreenState extends State<AdminDriversScreen>
                     ? IconButton(
                         icon: Icon(Icons.close_rounded,
                             color: Colors.grey[400], size: 18),
-                        onPressed: () {
-                          _searchController.clear();
-                        },
+                        onPressed: () => _searchController.clear(),
                       )
                     : null,
                 filled: true,
@@ -887,14 +967,11 @@ class _AdminDriversScreenState extends State<AdminDriversScreen>
                 ),
                 focusedBorder: OutlineInputBorder(
                   borderRadius: BorderRadius.circular(12),
-                  borderSide:
-                      BorderSide(color: Colors.yellow[800]!, width: 2),
+                  borderSide: BorderSide(color: Colors.yellow[800]!, width: 2),
                 ),
               ),
             ),
           ),
-
-          // ── LIST ───────────────────────────────────────
           Expanded(
             child: _isLoading
                 ? Center(
@@ -975,8 +1052,7 @@ class _AdminDriversScreenState extends State<AdminDriversScreen>
                                     16, 16, 16, 100),
                                 itemCount: _filteredDrivers.length,
                                 itemBuilder: (context, index) =>
-                                    _buildDriverCard(
-                                        _filteredDrivers[index]),
+                                    _buildDriverCard(_filteredDrivers[index]),
                               ),
                             ),
                           ),
@@ -1004,16 +1080,13 @@ class _AdminDriversScreenState extends State<AdminDriversScreen>
         child: Column(
           crossAxisAlignment: CrossAxisAlignment.start,
           children: [
-
             // ── Header ──────────────────────────────────
             Row(children: [
-              // Avatar
               Container(
                 padding: const EdgeInsets.all(2),
                 decoration: BoxDecoration(
                   shape: BoxShape.circle,
-                  border: Border.all(
-                      color: Colors.yellow[300]!, width: 2),
+                  border: Border.all(color: Colors.yellow[300]!, width: 2),
                 ),
                 child: CircleAvatar(
                   radius: 24,
@@ -1044,7 +1117,6 @@ class _AdminDriversScreenState extends State<AdminDriversScreen>
                   ],
                 ),
               ),
-              // Status badge
               Container(
                 padding: const EdgeInsets.symmetric(
                     horizontal: 10, vertical: 5),
@@ -1065,16 +1137,13 @@ class _AdminDriversScreenState extends State<AdminDriversScreen>
 
             // ── Info rows ────────────────────────────────
             Row(children: [
-              Icon(Icons.phone_outlined,
-                  size: 14, color: Colors.grey[400]),
+              Icon(Icons.phone_outlined, size: 14, color: Colors.grey[400]),
               const SizedBox(width: 6),
               Text(driver['phone'] ?? 'N/A',
-                  style: TextStyle(
-                      fontSize: 13, color: Colors.grey[600])),
+                  style: TextStyle(fontSize: 13, color: Colors.grey[600])),
               const SizedBox(width: 16),
               Container(
-                padding: const EdgeInsets.symmetric(
-                    horizontal: 8, vertical: 3),
+                padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 3),
                 decoration: BoxDecoration(
                   color: Colors.yellow[50],
                   borderRadius: BorderRadius.circular(8),
@@ -1092,16 +1161,44 @@ class _AdminDriversScreenState extends State<AdminDriversScreen>
                   size: 14, color: Colors.grey[400]),
               const SizedBox(width: 6),
               Text(driver['vehicle_number'] ?? 'N/A',
-                  style: TextStyle(
-                      fontSize: 13, color: Colors.grey[600])),
+                  style: TextStyle(fontSize: 13, color: Colors.grey[600])),
               const SizedBox(width: 16),
               Icon(Icons.card_membership_outlined,
                   size: 14, color: Colors.grey[400]),
               const SizedBox(width: 6),
               Text(driver['license_number'] ?? 'N/A',
-                  style: TextStyle(
-                      fontSize: 13, color: Colors.grey[600])),
+                  style: TextStyle(fontSize: 13, color: Colors.grey[600])),
             ]),
+
+            // ✅ License image button
+            if (driver['license_image'] != null) ...[
+              const SizedBox(height: 10),
+              GestureDetector(
+                onTap: () => _showLicenseImageDialog(driver),
+                child: Container(
+                  padding: const EdgeInsets.symmetric(
+                      horizontal: 10, vertical: 8),
+                  decoration: BoxDecoration(
+                    color: Colors.yellow[50],
+                    borderRadius: BorderRadius.circular(10),
+                    border: Border.all(color: Colors.yellow[200]!),
+                  ),
+                  child: Row(children: [
+                    Icon(Icons.photo_camera_outlined,
+                        size: 14, color: Colors.yellow[800]),
+                    const SizedBox(width: 6),
+                    Text('View License Photo',
+                        style: TextStyle(
+                            fontSize: 13,
+                            color: Colors.yellow[800],
+                            fontWeight: FontWeight.w600)),
+                    const Spacer(),
+                    Icon(Icons.chevron_right_rounded,
+                        size: 16, color: Colors.yellow[800]),
+                  ]),
+                ),
+              ),
+            ],
 
             const SizedBox(height: 14),
 
@@ -1118,8 +1215,7 @@ class _AdminDriversScreenState extends State<AdminDriversScreen>
                           fontWeight: FontWeight.w600,
                           fontSize: 13)),
                   style: OutlinedButton.styleFrom(
-                    padding:
-                        const EdgeInsets.symmetric(vertical: 10),
+                    padding: const EdgeInsets.symmetric(vertical: 10),
                     side: BorderSide(color: Colors.yellow[200]!),
                     shape: RoundedRectangleBorder(
                         borderRadius: BorderRadius.circular(10)),
@@ -1138,8 +1234,7 @@ class _AdminDriversScreenState extends State<AdminDriversScreen>
                           fontWeight: FontWeight.w600,
                           fontSize: 13)),
                   style: OutlinedButton.styleFrom(
-                    padding:
-                        const EdgeInsets.symmetric(vertical: 10),
+                    padding: const EdgeInsets.symmetric(vertical: 10),
                     side: BorderSide(color: Colors.red.shade200),
                     shape: RoundedRectangleBorder(
                         borderRadius: BorderRadius.circular(10)),
