@@ -1,7 +1,9 @@
+import 'dart:io';
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:provider/provider.dart';
 import 'package:shared_preferences/shared_preferences.dart';
+import 'package:image_picker/image_picker.dart';
 import '../providers/auth_provider.dart';
 import '../services/api_service.dart';
 import 'passenger_home_screen.dart';
@@ -12,24 +14,17 @@ class LicenseNumberFormatter extends TextInputFormatter {
   @override
   TextEditingValue formatEditUpdate(
       TextEditingValue oldValue, TextEditingValue newValue) {
-    // Strip all dashes, uppercase
     String raw = newValue.text.replaceAll('-', '').toUpperCase();
-
     String formatted = '';
-
     for (int i = 0; i < raw.length; i++) {
       if (i == 1 && raw.length > 1) {
-        // After first letter, insert dash before numbers
         formatted += '-';
       }
       formatted += raw[i];
     }
-
-    // Limit: 1 letter + dash + up to 5 digits = 7 chars displayed
     if (formatted.length > 7) {
       formatted = formatted.substring(0, 7);
     }
-
     return TextEditingValue(
       text: formatted,
       selection: TextSelection.collapsed(offset: formatted.length),
@@ -42,27 +37,19 @@ class VehicleNumberFormatter extends TextInputFormatter {
   @override
   TextEditingValue formatEditUpdate(
       TextEditingValue oldValue, TextEditingValue newValue) {
-    // Strip all dashes, uppercase
     String raw = newValue.text.replaceAll('-', '').toUpperCase();
-
     String formatted = '';
-
     for (int i = 0; i < raw.length; i++) {
       if (i == 2 && raw.length > 2) {
-        // After 2 letters (BP), insert first dash
         formatted += '-';
       } else if (i == 3 && raw.length > 3) {
-        // After 1 digit (1), insert second dash
         formatted += '-';
       }
       formatted += raw[i];
     }
-
-    // Limit: BP-1-B6884 = 2+1+1+1+1+4 chars + 2 dashes = 10 chars displayed
     if (formatted.length > 10) {
       formatted = formatted.substring(0, 10);
     }
-
     return TextEditingValue(
       text: formatted,
       selection: TextSelection.collapsed(offset: formatted.length),
@@ -89,9 +76,13 @@ class _RegisterScreenState extends State<RegisterScreen>
   final _licenseNumberController = TextEditingController();
 
   String _userType = 'passenger';
-  String? _vehicleType; // ✅ nullable — loaded from API
+  String? _vehicleType;
   bool _showPassword = false;
   bool _showConfirmPassword = false;
+
+  // ✅ License image
+  File? _licenseImage;
+  final ImagePicker _imagePicker = ImagePicker();
 
   // ✅ Dynamic vehicle types
   List<Map<String, String>> _vehicleTypes = [];
@@ -115,12 +106,9 @@ class _RegisterScreenState extends State<RegisterScreen>
       end: Offset.zero,
     ).animate(CurvedAnimation(parent: _animController, curve: Curves.easeOut));
     _animController.forward();
-
-    // ✅ Load vehicle types from API
     _loadVehicleTypes();
   }
 
-  // ✅ Fetch vehicle types from API
   Future<void> _loadVehicleTypes() async {
     setState(() => _loadingVehicleTypes = true);
     try {
@@ -137,8 +125,7 @@ class _RegisterScreenState extends State<RegisterScreen>
         _loadingVehicleTypes = false;
       });
     } catch (e) {
-        print('Vehicle types error: $e');
-      // ✅ Fallback to defaults if API fails
+      print('Vehicle types error: $e');
       setState(() {
         _vehicleTypes = [
           {'name': '4-seater', 'display_name': '4-Seater'},
@@ -149,6 +136,120 @@ class _RegisterScreenState extends State<RegisterScreen>
         _loadingVehicleTypes = false;
       });
     }
+  }
+
+  // ✅ Pick license image from camera or gallery
+  Future<void> _pickLicenseImage(ImageSource source) async {
+    final picked = await _imagePicker.pickImage(
+      source: source,
+      imageQuality: 80,
+    );
+    if (picked != null) {
+      setState(() => _licenseImage = File(picked.path));
+    }
+  }
+
+  // ✅ Show image source picker
+  void _showImageSourceDialog() {
+    showModalBottomSheet(
+      context: context,
+      backgroundColor: Colors.transparent,
+      builder: (ctx) => Container(
+        padding: const EdgeInsets.fromLTRB(20, 12, 20, 32),
+        decoration: const BoxDecoration(
+          color: Colors.white,
+          borderRadius: BorderRadius.vertical(top: Radius.circular(24)),
+        ),
+        child: Column(
+          mainAxisSize: MainAxisSize.min,
+          children: [
+            Container(
+              width: 40, height: 4,
+              decoration: BoxDecoration(
+                color: Colors.grey[300],
+                borderRadius: BorderRadius.circular(2),
+              ),
+            ),
+            const SizedBox(height: 20),
+            const Text('Upload License Photo',
+                style: TextStyle(fontSize: 16, fontWeight: FontWeight.w700, color: Colors.black87)),
+            const SizedBox(height: 16),
+            // Camera option
+            InkWell(
+              onTap: () {
+                Navigator.pop(ctx);
+                _pickLicenseImage(ImageSource.camera);
+              },
+              borderRadius: BorderRadius.circular(14),
+              child: Container(
+                padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 14),
+                decoration: BoxDecoration(
+                  color: Colors.grey[50],
+                  borderRadius: BorderRadius.circular(14),
+                  border: Border.all(color: Colors.grey.shade100),
+                ),
+                child: Row(children: [
+                  Container(
+                    width: 44, height: 44,
+                    decoration: BoxDecoration(
+                      color: Colors.yellow[50],
+                      borderRadius: BorderRadius.circular(12),
+                    ),
+                    child: Icon(Icons.camera_alt_rounded, color: Colors.yellow[800], size: 22),
+                  ),
+                  const SizedBox(width: 14),
+                  const Expanded(
+                    child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
+                      Text('Take Photo', style: TextStyle(fontSize: 14, fontWeight: FontWeight.w700, color: Colors.black87)),
+                      SizedBox(height: 2),
+                      Text('Use camera to capture license', style: TextStyle(fontSize: 12, color: Colors.grey)),
+                    ]),
+                  ),
+                  Icon(Icons.chevron_right_rounded, color: Colors.grey[300], size: 22),
+                ]),
+              ),
+            ),
+            const SizedBox(height: 10),
+            // Gallery option
+            InkWell(
+              onTap: () {
+                Navigator.pop(ctx);
+                _pickLicenseImage(ImageSource.gallery);
+              },
+              borderRadius: BorderRadius.circular(14),
+              child: Container(
+                padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 14),
+                decoration: BoxDecoration(
+                  color: Colors.grey[50],
+                  borderRadius: BorderRadius.circular(14),
+                  border: Border.all(color: Colors.grey.shade100),
+                ),
+                child: Row(children: [
+                  Container(
+                    width: 44, height: 44,
+                    decoration: BoxDecoration(
+                      color: Colors.yellow[50],
+                      borderRadius: BorderRadius.circular(12),
+                    ),
+                    child: Icon(Icons.photo_library_rounded, color: Colors.yellow[800], size: 22),
+                  ),
+                  const SizedBox(width: 14),
+                  const Expanded(
+                    child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
+                      Text('Choose from Gallery', style: TextStyle(fontSize: 14, fontWeight: FontWeight.w700, color: Colors.black87)),
+                      SizedBox(height: 2),
+                      Text('Pick from your photo library', style: TextStyle(fontSize: 12, color: Colors.grey)),
+                    ]),
+                  ),
+                  Icon(Icons.chevron_right_rounded, color: Colors.grey[300], size: 22),
+                ]),
+              ),
+            ),
+            const SizedBox(height: 8),
+          ],
+        ),
+      ),
+    );
   }
 
   @override
@@ -241,6 +342,12 @@ class _RegisterScreenState extends State<RegisterScreen>
 
   Future<void> _register() async {
     if (_formKey.currentState!.validate()) {
+      // ✅ Check license image is uploaded for driver
+      if (_userType == 'driver' && _licenseImage == null) {
+        _showErrorDialog('Please upload a photo of your license.');
+        return;
+      }
+
       final authProvider = Provider.of<AuthProvider>(context, listen: false);
 
       final success = await authProvider.register(
@@ -252,6 +359,7 @@ class _RegisterScreenState extends State<RegisterScreen>
         vehicleType: _userType == 'driver' ? _vehicleType : null,
         vehicleNumber: _userType == 'driver' ? _vehicleNumberController.text.trim() : null,
         licenseNumber: _userType == 'driver' ? _licenseNumberController.text.trim() : null,
+        licenseImagePath: _userType == 'driver' ? _licenseImage?.path : null, // ✅ pass image
       );
 
       if (success && mounted) {
@@ -471,8 +579,6 @@ class _RegisterScreenState extends State<RegisterScreen>
                           Text('Vehicle Type', style: TextStyle(color: Colors.grey[600], fontSize: 13, fontWeight: FontWeight.w500)),
                         ]),
                         const SizedBox(height: 12),
-
-                        // ✅ Loading spinner or dynamic chips
                         _loadingVehicleTypes
                             ? Center(child: Padding(
                                 padding: const EdgeInsets.symmetric(vertical: 8),
@@ -493,9 +599,7 @@ class _RegisterScreenState extends State<RegisterScreen>
                                           decoration: BoxDecoration(
                                             color: selected ? Colors.yellow[800] : Colors.yellow[50],
                                             borderRadius: BorderRadius.circular(10),
-                                            border: Border.all(
-                                              color: selected ? Colors.yellow[800]! : Colors.yellow[200]!,
-                                            ),
+                                            border: Border.all(color: selected ? Colors.yellow[800]! : Colors.yellow[200]!),
                                           ),
                                           child: Text(
                                             type['display_name']!,
@@ -512,7 +616,6 @@ class _RegisterScreenState extends State<RegisterScreen>
                     ),
                     const SizedBox(height: 14),
 
-                    // ✅ Vehicle Number with auto-formatter: BP-1-B6884
                     _buildField(
                       controller: _vehicleNumberController,
                       label: 'Vehicle Number',
@@ -525,7 +628,6 @@ class _RegisterScreenState extends State<RegisterScreen>
                     ),
                     const SizedBox(height: 14),
 
-                    // ✅ License Number with auto-formatter: G-13947
                     _buildField(
                       controller: _licenseNumberController,
                       label: 'License Number',
@@ -535,6 +637,90 @@ class _RegisterScreenState extends State<RegisterScreen>
                       inputFormatters: [LicenseNumberFormatter()],
                       validator: (value) => (_userType == 'driver' && (value == null || value.isEmpty))
                           ? 'Please enter license number' : null,
+                    ),
+                    const SizedBox(height: 14),
+
+                    // ✅ License Image Upload
+                    Container(
+                      padding: const EdgeInsets.all(14),
+                      decoration: BoxDecoration(
+                        color: Colors.white,
+                        borderRadius: BorderRadius.circular(14),
+                        border: Border.all(
+                          color: _licenseImage != null ? Colors.yellow[800]! : Colors.yellow[200]!,
+                        ),
+                      ),
+                      child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
+                        Row(children: [
+                          Icon(Icons.photo_camera_outlined, color: Colors.yellow[800], size: 18),
+                          const SizedBox(width: 8),
+                          Text('License Photo',
+                              style: TextStyle(color: Colors.grey[600], fontSize: 13, fontWeight: FontWeight.w500)),
+                          const Spacer(),
+                          if (_licenseImage != null)
+                            GestureDetector(
+                              onTap: () => setState(() => _licenseImage = null),
+                              child: Icon(Icons.close_rounded, color: Colors.red[400], size: 18),
+                            ),
+                        ]),
+                        const SizedBox(height: 12),
+
+                        // ✅ Show image preview or upload button
+                        if (_licenseImage != null)
+                          ClipRRect(
+                            borderRadius: BorderRadius.circular(10),
+                            child: Image.file(
+                              _licenseImage!,
+                              width: double.infinity,
+                              height: 160,
+                              fit: BoxFit.cover,
+                            ),
+                          )
+                        else
+                          GestureDetector(
+                            onTap: _showImageSourceDialog,
+                            child: Container(
+                              width: double.infinity,
+                              height: 100,
+                              decoration: BoxDecoration(
+                                color: Colors.yellow[50],
+                                borderRadius: BorderRadius.circular(10),
+                                border: Border.all(
+                                  color: Colors.yellow[200]!,
+                                  style: BorderStyle.solid,
+                                ),
+                              ),
+                              child: Column(
+                                mainAxisAlignment: MainAxisAlignment.center,
+                                children: [
+                                  Icon(Icons.upload_rounded, color: Colors.yellow[800], size: 32),
+                                  const SizedBox(height: 8),
+                                  Text('Tap to upload license photo',
+                                      style: TextStyle(color: Colors.yellow[800], fontSize: 13, fontWeight: FontWeight.w600)),
+                                  const SizedBox(height: 4),
+                                  Text('Camera or Gallery',
+                                      style: TextStyle(color: Colors.grey[400], fontSize: 11)),
+                                ],
+                              ),
+                            ),
+                          ),
+
+                        if (_licenseImage != null) ...[
+                          const SizedBox(height: 10),
+                          GestureDetector(
+                            onTap: _showImageSourceDialog,
+                            child: Row(
+                              mainAxisAlignment: MainAxisAlignment.center,
+                              children: [
+                                Icon(Icons.refresh_rounded, color: Colors.yellow[800], size: 16),
+                                const SizedBox(width: 6),
+                                Text('Change Photo',
+                                    style: TextStyle(color: Colors.yellow[800], fontSize: 13, fontWeight: FontWeight.w600)),
+                              ],
+                            ),
+                          ),
+                        ],
+                      ]),
                     ),
                   ],
 

@@ -25,21 +25,29 @@ class AuthProvider with ChangeNotifier {
     String? vehicleType,
     String? vehicleNumber,
     String? licenseNumber,
+    String? licenseImagePath, // ✅ added license image path
   }) async {
     _isLoading = true;
     _errorMessage = null;
     notifyListeners();
 
     try {
+      // ✅ Upload license image to Cloudinary first if provided
+      String? licenseImageUrl;
+      if (licenseImagePath != null) {
+        licenseImageUrl = await _apiService.uploadImageToCloudinary(licenseImagePath);
+      }
+
       final data = {
         'name':      name,
         'email':     email,
         'password':  password,
         'user_type': userType,
         'phone':     phone,
-        if (vehicleType != null)   'vehicle_type':   vehicleType,
-        if (vehicleNumber != null) 'vehicle_number': vehicleNumber,
-        if (licenseNumber != null) 'license_number': licenseNumber,
+        if (vehicleType != null)    'vehicle_type':   vehicleType,
+        if (vehicleNumber != null)  'vehicle_number': vehicleNumber,
+        if (licenseNumber != null)  'license_number': licenseNumber,
+        if (licenseImageUrl != null) 'license_image': licenseImageUrl, // ✅ send URL
       };
 
       final response = await _apiService.post('/register', data);
@@ -198,7 +206,7 @@ class AuthProvider with ChangeNotifier {
   Future<bool> resetPassword({
     required String email,
     required String token,
-    required String userType, // ✅ added userType
+    required String userType,
     required String newPassword,
     required String confirmPassword,
   }) async {
@@ -210,7 +218,7 @@ class AuthProvider with ChangeNotifier {
       await _apiService.post('/reset-password', {
         'email':            email,
         'token':            token,
-        'user_type':        userType, // ✅ send userType to backend
+        'user_type':        userType,
         'new_password':     newPassword,
         'confirm_password': confirmPassword,
       });
