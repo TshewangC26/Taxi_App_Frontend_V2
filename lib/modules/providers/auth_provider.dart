@@ -100,7 +100,6 @@ class AuthProvider with ChangeNotifier {
     notifyListeners();
   }
 
-  // ✅ Updated to support email
   Future<bool> updateProfile({
     required String name,
     required String phone,
@@ -171,7 +170,7 @@ class AuthProvider with ChangeNotifier {
 
   Future<bool> forgotPassword({
     required String email,
-    required String userType, // ✅ added userType
+    required String userType,
   }) async {
     _isLoading    = true;
     _errorMessage = null;
@@ -180,7 +179,7 @@ class AuthProvider with ChangeNotifier {
     try {
       final response = await _apiService.post('/forgot-password', {
         'email':     email,
-        'user_type': userType, // ✅ send userType to backend
+        'user_type': userType,
       });
 
       _resetUserName = response['userName'];
@@ -199,6 +198,7 @@ class AuthProvider with ChangeNotifier {
   Future<bool> resetPassword({
     required String email,
     required String token,
+    required String userType, // ✅ added userType
     required String newPassword,
     required String confirmPassword,
   }) async {
@@ -210,6 +210,7 @@ class AuthProvider with ChangeNotifier {
       await _apiService.post('/reset-password', {
         'email':            email,
         'token':            token,
+        'user_type':        userType, // ✅ send userType to backend
         'new_password':     newPassword,
         'confirm_password': confirmPassword,
       });

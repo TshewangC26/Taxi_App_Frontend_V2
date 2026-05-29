@@ -25,13 +25,13 @@ class _ResetPasswordScreenState extends State<ResetPasswordScreen> {
   final _newPasswordController     = TextEditingController();
   final _confirmPasswordController = TextEditingController();
   bool _isLoading           = false;
-  bool _isResending         = false; // ✅ resend loading
+  bool _isResending         = false;
   bool _showNewPassword     = false;
   bool _showConfirmPassword = false;
 
   // ✅ Countdown timer
   late Timer _timer;
-  int _secondsLeft = 300; // 5 minutes
+  int _secondsLeft = 300;
   bool _codeExpired = false;
 
   @override
@@ -54,7 +54,6 @@ class _ResetPasswordScreenState extends State<ResetPasswordScreen> {
     });
   }
 
-  // ✅ Resend code — stays on same screen and resets timer
   Future<void> _resendCode() async {
     setState(() => _isResending = true);
 
@@ -70,7 +69,6 @@ class _ResetPasswordScreenState extends State<ResetPasswordScreen> {
     if (!mounted) return;
 
     if (success) {
-      // ✅ Reset timer and clear old code
       _timer.cancel();
       _codeController.clear();
       setState(() {
@@ -176,7 +174,6 @@ class _ResetPasswordScreenState extends State<ResetPasswordScreen> {
     );
   }
 
-  // ✅ Show expired dialog — resends code directly, no navigation
   void _showExpiredDialog() {
     showDialog(
       context: context,
@@ -219,8 +216,8 @@ class _ResetPasswordScreenState extends State<ResetPasswordScreen> {
                 width: double.infinity,
                 child: ElevatedButton(
                   onPressed: () async {
-                    Navigator.of(ctx).pop(); // close dialog
-                    await _resendCode();     // ✅ resend code & reset timer
+                    Navigator.of(ctx).pop();
+                    await _resendCode();
                   },
                   style: ElevatedButton.styleFrom(
                     backgroundColor: Colors.yellow[800],
@@ -254,6 +251,7 @@ class _ResetPasswordScreenState extends State<ResetPasswordScreen> {
       final success = await authProvider.resetPassword(
         email:           widget.email,
         token:           _codeController.text.trim(),
+        userType:        widget.userType, // ✅ pass userType
         newPassword:     _newPasswordController.text,
         confirmPassword: _confirmPasswordController.text,
       );
@@ -394,7 +392,7 @@ class _ResetPasswordScreenState extends State<ResetPasswordScreen> {
                               ),
                             )
                           : TextButton(
-                              onPressed: _resendCode, // ✅ resend directly
+                              onPressed: _resendCode,
                               child: Text(
                                 'Resend Code',
                                 style: TextStyle(
