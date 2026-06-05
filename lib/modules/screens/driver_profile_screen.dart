@@ -7,6 +7,7 @@ import 'driver_available_rides_screen.dart';
 import 'driver_my_rides_screen.dart';
 import 'driver_earnings_screen.dart';
 import 'driver_edit_profile_screen.dart';
+import 'driver_payment_details_screen.dart';
 import 'change_password_screen.dart';
 import 'login_screens.dart';
 import 'contact_us_screen.dart';
@@ -89,7 +90,6 @@ class _DriverProfileScreenState extends State<DriverProfileScreen>
     }
   }
 
-  // ✅ Hamburger menu
   void _openMenu() {
     showModalBottomSheet(
       context: context,
@@ -269,14 +269,26 @@ class _DriverProfileScreenState extends State<DriverProfileScreen>
         centerTitle: false,
         titleSpacing: 20,
         automaticallyImplyLeading: false,
-        title: Row(mainAxisSize: MainAxisSize.min, children: [
-          Image.asset('assets/images/taxi_logo.png', width: 36, height: 36, fit: BoxFit.contain),
-          const SizedBox(width: 10),
-          const Text('Easy Ride',
-              style: TextStyle(color: Colors.black87, fontWeight: FontWeight.w800, fontSize: 19, letterSpacing: 0.3)),
-        ]),
+        title: GestureDetector(
+          onTap: () {
+            Navigator.pushAndRemoveUntil(
+              context,
+              PageRouteBuilder(
+                pageBuilder: (_, animation, __) => FadeTransition(
+                    opacity: animation, child: const DriverHomeScreen()),
+                transitionDuration: const Duration(milliseconds: 300),
+              ),
+              (route) => false,
+            );
+          },
+          child: Row(mainAxisSize: MainAxisSize.min, children: [
+            Image.asset('assets/images/taxi_logo.png', width: 36, height: 36, fit: BoxFit.contain),
+            const SizedBox(width: 10),
+            const Text('Easy Ride',
+                style: TextStyle(color: Colors.black87, fontWeight: FontWeight.w800, fontSize: 19, letterSpacing: 0.3)),
+          ]),
+        ),
         actions: [
-          // ✅ Hamburger menu
           Padding(
             padding: const EdgeInsets.only(right: 12),
             child: InkWell(
@@ -519,10 +531,32 @@ class _DriverProfileScreenState extends State<DriverProfileScreen>
                         iconBg: Colors.orange[50]!,
                         iconColor: Colors.orange[700]!,
                         isFirst: false,
-                        isLast: true,
+                        isLast: false,
                         onTap: () {
                           Navigator.push(context, MaterialPageRoute(builder: (_) => ChangePasswordScreen()));
                         },
+                      ),
+                      Divider(height: 1, indent: 56, color: Colors.grey.shade100),
+                      _ActionRow(
+                        icon: Icons.payment_rounded,
+                        label: 'Payment Details',
+                        iconBg: Colors.blue[50]!,
+                        iconColor: Colors.blue[700]!,
+                        isFirst: false,
+                        isLast: false,
+                        onTap: () {
+                          Navigator.push(context, MaterialPageRoute(builder: (_) => const DriverPaymentDetailsScreen()));
+                        },
+                      ),
+                      Divider(height: 1, indent: 56, color: Colors.grey.shade100),
+                      _ActionRow(
+                        icon: Icons.logout_rounded,
+                        label: 'Logout',
+                        iconBg: Colors.red[50]!,
+                        iconColor: Colors.red[400]!,
+                        isFirst: false,
+                        isLast: true,
+                        onTap: _confirmLogout,
                       ),
                     ]),
 

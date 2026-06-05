@@ -24,7 +24,7 @@ class _LoginScreenState extends State<LoginScreen> {
   final _nameController = TextEditingController();
   final _passwordController = TextEditingController();
   bool _showPassword = false;
-  String _selectedRole = 'passenger'; // ✅ default role
+  String _selectedRole = 'passenger';
 
   @override
   void initState() {
@@ -38,6 +38,12 @@ class _LoginScreenState extends State<LoginScreen> {
   Future<void> _loadPrefillName() async {
     final prefs = await SharedPreferences.getInstance();
 
+    // ✅ Restore last selected role
+    final lastRole = prefs.getString('last_login_role');
+    if (lastRole != null && mounted) {
+      setState(() => _selectedRole = lastRole);
+    }
+
     final prefillName = prefs.getString('prefill_name');
     if (prefillName != null && mounted && _nameController.text.isEmpty) {
       setState(() {
@@ -49,9 +55,7 @@ class _LoginScreenState extends State<LoginScreen> {
     }
 
     final lastLoginName = prefs.getString('last_login_name');
-    if (lastLoginName != null &&
-        mounted &&
-        _nameController.text.isEmpty) {
+    if (lastLoginName != null && mounted && _nameController.text.isEmpty) {
       setState(() {
         _nameController.text = lastLoginName;
       });
@@ -65,7 +69,6 @@ class _LoginScreenState extends State<LoginScreen> {
     super.dispose();
   }
 
-  // ── Info menu (Contact Us / About Us) ─────────────────────────
   void _showInfoMenu() {
     showModalBottomSheet(
       context: context,
@@ -81,16 +84,10 @@ class _LoginScreenState extends State<LoginScreen> {
           children: [
             Container(
               width: 40, height: 4,
-              decoration: BoxDecoration(
-                  color: Colors.grey[300],
-                  borderRadius: BorderRadius.circular(2)),
+              decoration: BoxDecoration(color: Colors.grey[300], borderRadius: BorderRadius.circular(2)),
             ),
             const SizedBox(height: 20),
-            const Text('More Info',
-                style: TextStyle(
-                    fontSize: 16,
-                    fontWeight: FontWeight.w700,
-                    color: Colors.black87)),
+            const Text('More Info', style: TextStyle(fontSize: 16, fontWeight: FontWeight.w700, color: Colors.black87)),
             const SizedBox(height: 16),
             _infoTile(
               icon: Icons.headset_mic_rounded,
@@ -100,14 +97,10 @@ class _LoginScreenState extends State<LoginScreen> {
               subtitle: 'Get in touch with our support team',
               onTap: () {
                 Navigator.pop(ctx);
-                Navigator.push(
-                  context,
-                  PageRouteBuilder(
-                    pageBuilder: (_, a, __) => FadeTransition(
-                        opacity: a, child: const ContactUsScreen()),
-                    transitionDuration: const Duration(milliseconds: 300),
-                  ),
-                );
+                Navigator.push(context, PageRouteBuilder(
+                  pageBuilder: (_, a, __) => FadeTransition(opacity: a, child: const ContactUsScreen()),
+                  transitionDuration: const Duration(milliseconds: 300),
+                ));
               },
             ),
             const SizedBox(height: 10),
@@ -119,14 +112,10 @@ class _LoginScreenState extends State<LoginScreen> {
               subtitle: 'Learn more about Easy Ride',
               onTap: () {
                 Navigator.pop(ctx);
-                Navigator.push(
-                  context,
-                  PageRouteBuilder(
-                    pageBuilder: (_, a, __) => FadeTransition(
-                        opacity: a, child: const AboutUsScreen()),
-                    transitionDuration: const Duration(milliseconds: 300),
-                  ),
-                );
+                Navigator.push(context, PageRouteBuilder(
+                  pageBuilder: (_, a, __) => FadeTransition(opacity: a, child: const AboutUsScreen()),
+                  transitionDuration: const Duration(milliseconds: 300),
+                ));
               },
             ),
             const SizedBox(height: 8),
@@ -155,31 +144,16 @@ class _LoginScreenState extends State<LoginScreen> {
           border: Border.all(color: Colors.grey.shade100),
         ),
         child: Row(children: [
-          Container(
-            width: 44, height: 44,
-            decoration: BoxDecoration(
-                color: iconBg, borderRadius: BorderRadius.circular(12)),
-            child: Icon(icon, color: iconColor, size: 22),
-          ),
+          Container(width: 44, height: 44,
+              decoration: BoxDecoration(color: iconBg, borderRadius: BorderRadius.circular(12)),
+              child: Icon(icon, color: iconColor, size: 22)),
           const SizedBox(width: 14),
-          Expanded(
-            child: Column(
-              crossAxisAlignment: CrossAxisAlignment.start,
-              children: [
-                Text(label,
-                    style: const TextStyle(
-                        fontSize: 14,
-                        fontWeight: FontWeight.w700,
-                        color: Colors.black87)),
-                const SizedBox(height: 2),
-                Text(subtitle,
-                    style: TextStyle(
-                        fontSize: 12, color: Colors.grey[500])),
-              ],
-            ),
-          ),
-          Icon(Icons.chevron_right_rounded,
-              color: Colors.grey[300], size: 22),
+          Expanded(child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
+            Text(label, style: const TextStyle(fontSize: 14, fontWeight: FontWeight.w700, color: Colors.black87)),
+            const SizedBox(height: 2),
+            Text(subtitle, style: TextStyle(fontSize: 12, color: Colors.grey[500])),
+          ])),
+          Icon(Icons.chevron_right_rounded, color: Colors.grey[300], size: 22),
         ]),
       ),
     );
@@ -187,14 +161,12 @@ class _LoginScreenState extends State<LoginScreen> {
 
   Future<void> _login() async {
     if (_formKey.currentState!.validate()) {
-      final authProvider =
-          Provider.of<AuthProvider>(context, listen: false);
+      final authProvider = Provider.of<AuthProvider>(context, listen: false);
 
       String? fcmToken;
       try {
         final messaging = FirebaseMessaging.instance;
-        await messaging.requestPermission(
-            alert: true, badge: true, sound: true);
+        await messaging.requestPermission(alert: true, badge: true, sound: true);
         fcmToken = await messaging.getToken();
       } catch (e) {
         print('FCM token error: $e');
@@ -203,101 +175,64 @@ class _LoginScreenState extends State<LoginScreen> {
       final success = await authProvider.login(
         _nameController.text.trim(),
         _passwordController.text,
-        userType: _selectedRole, // ✅ pass selected role
+        userType: _selectedRole,
         fcmToken: fcmToken,
       );
 
       if (success && mounted) {
         final prefs = await SharedPreferences.getInstance();
-        await prefs.setString(
-            'last_login_name', _nameController.text.trim());
+        await prefs.setString('last_login_name', _nameController.text.trim());
+        // ✅ Save last selected role
+        await prefs.setString('last_login_role', _selectedRole);
 
-        ScaffoldMessenger.of(context).showSnackBar(
-          SnackBar(
-            content: const Text('Login successful!'),
-            backgroundColor: Colors.yellow[800],
-          ),
-        );
+        ScaffoldMessenger.of(context).showSnackBar(SnackBar(
+          content: const Text('Login successful!'),
+          backgroundColor: Colors.yellow[800],
+        ));
 
         final userType = authProvider.user?.userType;
 
         if (userType == 'passenger') {
-          Navigator.pushReplacement(
-            context,
-            MaterialPageRoute(
-                builder: (context) => const PassengerHomeScreen()),
-          );
+          Navigator.pushReplacement(context,
+              MaterialPageRoute(builder: (context) => const PassengerHomeScreen()));
         } else if (userType == 'driver') {
-          Navigator.pushReplacement(
-            context,
-            MaterialPageRoute(
-                builder: (context) => const DriverHomeScreen()),
-          );
+          Navigator.pushReplacement(context,
+              MaterialPageRoute(builder: (context) => const DriverHomeScreen()));
         } else if (userType == 'admin') {
-          Navigator.pushReplacement(
-            context,
-            MaterialPageRoute(
-                builder: (context) => const AdminHomeScreen()),
-          );
+          Navigator.pushReplacement(context,
+              MaterialPageRoute(builder: (context) => const AdminHomeScreen()));
         }
       } else if (mounted) {
         showDialog(
           context: context,
           barrierColor: Colors.black.withOpacity(0.5),
           builder: (ctx) => Dialog(
-            backgroundColor: Colors.transparent,
-            elevation: 0,
+            backgroundColor: Colors.transparent, elevation: 0,
             child: Container(
               padding: const EdgeInsets.all(28),
-              decoration: BoxDecoration(
-                  color: Colors.white,
-                  borderRadius: BorderRadius.circular(24)),
-              child: Column(
-                mainAxisSize: MainAxisSize.min,
-                children: [
-                  Container(
-                    width: 56, height: 56,
-                    decoration: BoxDecoration(
-                        color: Colors.red[50], shape: BoxShape.circle),
-                    child: Icon(Icons.error_outline_rounded,
-                        color: Colors.red[400], size: 28),
+              decoration: BoxDecoration(color: Colors.white, borderRadius: BorderRadius.circular(24)),
+              child: Column(mainAxisSize: MainAxisSize.min, children: [
+                Container(width: 56, height: 56,
+                    decoration: BoxDecoration(color: Colors.red[50], shape: BoxShape.circle),
+                    child: Icon(Icons.error_outline_rounded, color: Colors.red[400], size: 28)),
+                const SizedBox(height: 16),
+                const Text('Login Failed', style: TextStyle(fontSize: 20, fontWeight: FontWeight.w800, color: Colors.black87)),
+                const SizedBox(height: 8),
+                Text(
+                  'Invalid username or password.\nPlease check your credentials and try again.',
+                  textAlign: TextAlign.center,
+                  style: TextStyle(fontSize: 14, color: Colors.grey[500], height: 1.5),
+                ),
+                const SizedBox(height: 24),
+                SizedBox(width: double.infinity, height: 50,
+                  child: ElevatedButton(
+                    onPressed: () => Navigator.pop(ctx),
+                    style: ElevatedButton.styleFrom(backgroundColor: Colors.yellow[800], foregroundColor: Colors.white,
+                        elevation: 0, shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(14))),
+                    child: const Text('Try Again', style: TextStyle(fontSize: 15, fontWeight: FontWeight.w600)),
                   ),
-                  const SizedBox(height: 16),
-                  const Text('Login Failed',
-                      style: TextStyle(
-                          fontSize: 20,
-                          fontWeight: FontWeight.w800,
-                          color: Colors.black87)),
-                  const SizedBox(height: 8),
-                  Text(
-                    'Invalid username or password.\nPlease check your credentials and try again.',
-                    textAlign: TextAlign.center,
-                    style: TextStyle(
-                        fontSize: 14,
-                        color: Colors.grey[500],
-                        height: 1.5),
-                  ),
-                  const SizedBox(height: 24),
-                  SizedBox(
-                    width: double.infinity,
-                    height: 50,
-                    child: ElevatedButton(
-                      onPressed: () => Navigator.pop(ctx),
-                      style: ElevatedButton.styleFrom(
-                        backgroundColor: Colors.yellow[800],
-                        foregroundColor: Colors.white,
-                        elevation: 0,
-                        shape: RoundedRectangleBorder(
-                            borderRadius: BorderRadius.circular(14)),
-                      ),
-                      child: const Text('Try Again',
-                          style: TextStyle(
-                              fontSize: 15,
-                              fontWeight: FontWeight.w600)),
-                    ),
-                  ),
-                ],
-              ),
+                ),
+              ]),
             ),
           ),
         );
@@ -312,25 +247,18 @@ class _LoginScreenState extends State<LoginScreen> {
     return Scaffold(
       backgroundColor: Colors.white,
       appBar: AppBar(
-        backgroundColor: Colors.white,
-        elevation: 0,
+        backgroundColor: Colors.white, elevation: 0,
         iconTheme: const IconThemeData(color: Colors.black),
         automaticallyImplyLeading: false,
         actions: [
           Padding(
             padding: const EdgeInsets.only(right: 12),
             child: InkWell(
-              onTap: _showInfoMenu,
-              borderRadius: BorderRadius.circular(10),
+              onTap: _showInfoMenu, borderRadius: BorderRadius.circular(10),
               child: Container(
                 padding: const EdgeInsets.all(8),
-                decoration: BoxDecoration(
-                  color: Colors.grey[100],
-                  borderRadius: BorderRadius.circular(10),
-                  border: Border.all(color: Colors.grey.shade200),
-                ),
-                child: Icon(Icons.info_outline_rounded,
-                    color: Colors.yellow[800], size: 20),
+                decoration: BoxDecoration(color: Colors.grey[100], borderRadius: BorderRadius.circular(10), border: Border.all(color: Colors.grey.shade200)),
+                child: Icon(Icons.info_outline_rounded, color: Colors.yellow[800], size: 20),
               ),
             ),
           ),
@@ -350,115 +278,68 @@ class _LoginScreenState extends State<LoginScreen> {
                   child: Column(
                     mainAxisSize: MainAxisSize.min,
                     children: [
-                      const Text(
-                        'Easy Ride',
+                      const Text('Easy Ride',
                         style: TextStyle(
-                          fontFamily: 'serif',
-                          fontSize: 24,
-                          fontWeight: FontWeight.w300,
-                          fontStyle: FontStyle.italic,
-                          color: Colors.black87,
-                          letterSpacing: 2.5,
-                          height: 1.1,
+                          fontFamily: 'serif', fontSize: 24,
+                          fontWeight: FontWeight.w300, fontStyle: FontStyle.italic,
+                          color: Colors.black87, letterSpacing: 2.5, height: 1.1,
                         ),
                       ),
                       const SizedBox(height: 16),
-                      Image.asset(
-                        'assets/images/taxi_logo.png',
-                        width: 200, height: 200,
-                        fit: BoxFit.contain,
-                      ),
+                      Image.asset('assets/images/taxi_logo.png', width: 200, height: 200, fit: BoxFit.contain),
                     ],
                   ),
                 ),
 
                 const SizedBox(height: 30),
 
-                // ✅ Role Toggle
+                // ✅ Role Toggle — remembers last selected role
                 Container(
                   decoration: BoxDecoration(
                     color: Colors.grey[100],
                     borderRadius: BorderRadius.circular(12),
                     border: Border.all(color: Colors.grey.shade200),
                   ),
-                  child: Row(
-                    children: [
-                      Expanded(
-                        child: GestureDetector(
-                          onTap: () => setState(() => _selectedRole = 'passenger'),
-                          child: Container(
-                            padding: const EdgeInsets.symmetric(vertical: 12),
-                            decoration: BoxDecoration(
-                              color: _selectedRole == 'passenger'
-                                  ? Colors.yellow[800]
-                                  : Colors.transparent,
-                              borderRadius: BorderRadius.circular(10),
-                            ),
-                            child: Row(
-                              mainAxisAlignment: MainAxisAlignment.center,
-                              children: [
-                                Icon(
-                                  Icons.person_rounded,
-                                  size: 18,
-                                  color: _selectedRole == 'passenger'
-                                      ? Colors.white
-                                      : Colors.grey[600],
-                                ),
-                                const SizedBox(width: 6),
-                                Text(
-                                  'Passenger',
-                                  style: TextStyle(
-                                    fontSize: 14,
-                                    fontWeight: FontWeight.w600,
-                                    color: _selectedRole == 'passenger'
-                                        ? Colors.white
-                                        : Colors.grey[600],
-                                  ),
-                                ),
-                              ],
-                            ),
+                  child: Row(children: [
+                    Expanded(
+                      child: GestureDetector(
+                        onTap: () => setState(() => _selectedRole = 'passenger'),
+                        child: Container(
+                          padding: const EdgeInsets.symmetric(vertical: 12),
+                          decoration: BoxDecoration(
+                            color: _selectedRole == 'passenger' ? Colors.yellow[800] : Colors.transparent,
+                            borderRadius: BorderRadius.circular(10),
                           ),
+                          child: Row(mainAxisAlignment: MainAxisAlignment.center, children: [
+                            Icon(Icons.person_rounded, size: 18,
+                                color: _selectedRole == 'passenger' ? Colors.white : Colors.grey[600]),
+                            const SizedBox(width: 6),
+                            Text('Passenger', style: TextStyle(fontSize: 14, fontWeight: FontWeight.w600,
+                                color: _selectedRole == 'passenger' ? Colors.white : Colors.grey[600])),
+                          ]),
                         ),
                       ),
-                      Expanded(
-                        child: GestureDetector(
-                          onTap: () => setState(() => _selectedRole = 'driver'),
-                          child: Container(
-                            padding: const EdgeInsets.symmetric(vertical: 12),
-                            decoration: BoxDecoration(
-                              color: _selectedRole == 'driver'
-                                  ? Colors.yellow[800]
-                                  : Colors.transparent,
-                              borderRadius: BorderRadius.circular(10),
-                            ),
-                            child: Row(
-                              mainAxisAlignment: MainAxisAlignment.center,
-                              children: [
-                                Icon(
-                                  Icons.drive_eta_rounded,
-                                  size: 18,
-                                  color: _selectedRole == 'driver'
-                                      ? Colors.white
-                                      : Colors.grey[600],
-                                ),
-                                const SizedBox(width: 6),
-                                Text(
-                                  'Driver',
-                                  style: TextStyle(
-                                    fontSize: 14,
-                                    fontWeight: FontWeight.w600,
-                                    color: _selectedRole == 'driver'
-                                        ? Colors.white
-                                        : Colors.grey[600],
-                                  ),
-                                ),
-                              ],
-                            ),
+                    ),
+                    Expanded(
+                      child: GestureDetector(
+                        onTap: () => setState(() => _selectedRole = 'driver'),
+                        child: Container(
+                          padding: const EdgeInsets.symmetric(vertical: 12),
+                          decoration: BoxDecoration(
+                            color: _selectedRole == 'driver' ? Colors.yellow[800] : Colors.transparent,
+                            borderRadius: BorderRadius.circular(10),
                           ),
+                          child: Row(mainAxisAlignment: MainAxisAlignment.center, children: [
+                            Icon(Icons.drive_eta_rounded, size: 18,
+                                color: _selectedRole == 'driver' ? Colors.white : Colors.grey[600]),
+                            const SizedBox(width: 6),
+                            Text('Driver', style: TextStyle(fontSize: 14, fontWeight: FontWeight.w600,
+                                color: _selectedRole == 'driver' ? Colors.white : Colors.grey[600])),
+                          ]),
                         ),
                       ),
-                    ],
-                  ),
+                    ),
+                  ]),
                 ),
 
                 const SizedBox(height: 16),
@@ -468,29 +349,15 @@ class _LoginScreenState extends State<LoginScreen> {
                   decoration: InputDecoration(
                     labelText: 'Name',
                     labelStyle: TextStyle(color: Colors.grey[700]),
-                    border: OutlineInputBorder(
-                      borderRadius: BorderRadius.circular(12),
-                      borderSide: const BorderSide(color: Colors.grey),
-                    ),
-                    enabledBorder: OutlineInputBorder(
-                      borderRadius: BorderRadius.circular(12),
-                      borderSide: const BorderSide(color: Colors.grey),
-                    ),
-                    focusedBorder: OutlineInputBorder(
-                      borderRadius: BorderRadius.circular(12),
-                      borderSide: BorderSide(
-                          color: Colors.yellow[800]!, width: 2),
-                    ),
-                    prefixIcon: Icon(Icons.person_outline,
-                        color: Colors.yellow[800]),
-                    filled: true,
-                    fillColor: Colors.white,
+                    border: OutlineInputBorder(borderRadius: BorderRadius.circular(12), borderSide: const BorderSide(color: Colors.grey)),
+                    enabledBorder: OutlineInputBorder(borderRadius: BorderRadius.circular(12), borderSide: const BorderSide(color: Colors.grey)),
+                    focusedBorder: OutlineInputBorder(borderRadius: BorderRadius.circular(12), borderSide: BorderSide(color: Colors.yellow[800]!, width: 2)),
+                    prefixIcon: Icon(Icons.person_outline, color: Colors.yellow[800]),
+                    filled: true, fillColor: Colors.white,
                   ),
                   style: const TextStyle(color: Colors.black),
                   validator: (value) {
-                    if (value == null || value.isEmpty) {
-                      return 'Please enter your name';
-                    }
+                    if (value == null || value.isEmpty) return 'Please enter your name';
                     return null;
                   },
                 ),
@@ -502,79 +369,39 @@ class _LoginScreenState extends State<LoginScreen> {
                   decoration: InputDecoration(
                     labelText: 'Password',
                     labelStyle: TextStyle(color: Colors.grey[700]),
-                    border: OutlineInputBorder(
-                      borderRadius: BorderRadius.circular(12),
-                      borderSide: const BorderSide(color: Colors.grey),
-                    ),
-                    enabledBorder: OutlineInputBorder(
-                      borderRadius: BorderRadius.circular(12),
-                      borderSide: const BorderSide(color: Colors.grey),
-                    ),
-                    focusedBorder: OutlineInputBorder(
-                      borderRadius: BorderRadius.circular(12),
-                      borderSide: BorderSide(
-                          color: Colors.yellow[800]!, width: 2),
-                    ),
-                    prefixIcon: Icon(Icons.lock_outline,
-                        color: Colors.yellow[800]),
+                    border: OutlineInputBorder(borderRadius: BorderRadius.circular(12), borderSide: const BorderSide(color: Colors.grey)),
+                    enabledBorder: OutlineInputBorder(borderRadius: BorderRadius.circular(12), borderSide: const BorderSide(color: Colors.grey)),
+                    focusedBorder: OutlineInputBorder(borderRadius: BorderRadius.circular(12), borderSide: BorderSide(color: Colors.yellow[800]!, width: 2)),
+                    prefixIcon: Icon(Icons.lock_outline, color: Colors.yellow[800]),
                     suffixIcon: IconButton(
-                      icon: Icon(
-                        _showPassword
-                            ? Icons.visibility_off_outlined
-                            : Icons.visibility_outlined,
-                        color: Colors.yellow[800],
-                      ),
-                      onPressed: () {
-                        setState(() {
-                          _showPassword = !_showPassword;
-                        });
-                      },
+                      icon: Icon(_showPassword ? Icons.visibility_off_outlined : Icons.visibility_outlined, color: Colors.yellow[800]),
+                      onPressed: () => setState(() => _showPassword = !_showPassword),
                     ),
-                    filled: true,
-                    fillColor: Colors.white,
+                    filled: true, fillColor: Colors.white,
                   ),
                   style: const TextStyle(color: Colors.black),
                   validator: (value) {
-                    if (value == null || value.isEmpty) {
-                      return 'Please enter your password';
-                    }
+                    if (value == null || value.isEmpty) return 'Please enter your password';
                     return null;
                   },
                 ),
                 const SizedBox(height: 32),
 
                 authProvider.isLoading
-                    ? Center(
-                        child: CircularProgressIndicator(
-                          valueColor: AlwaysStoppedAnimation<Color>(
-                              Colors.yellow[800]!),
-                        ),
-                      )
+                    ? Center(child: CircularProgressIndicator(valueColor: AlwaysStoppedAnimation<Color>(Colors.yellow[800]!)))
                     : SizedBox(
                         height: 54,
                         child: ElevatedButton(
                           onPressed: _login,
                           style: ElevatedButton.styleFrom(
-                            backgroundColor: Colors.yellow[800],
-                            foregroundColor: Colors.white,
-                            shape: RoundedRectangleBorder(
-                              borderRadius: BorderRadius.circular(12),
-                            ),
-                            elevation: 0,
+                            backgroundColor: Colors.yellow[800], foregroundColor: Colors.white,
+                            shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)), elevation: 0,
                           ),
-                          child: const Row(
-                            mainAxisAlignment:
-                                MainAxisAlignment.center,
-                            children: [
-                              Icon(Icons.directions_car_filled,
-                                  size: 20),
-                              SizedBox(width: 10),
-                              Text('Login',
-                                  style: TextStyle(
-                                      fontSize: 16,
-                                      fontWeight: FontWeight.w600)),
-                            ],
-                          ),
+                          child: const Row(mainAxisAlignment: MainAxisAlignment.center, children: [
+                            Icon(Icons.directions_car_filled, size: 20),
+                            SizedBox(width: 10),
+                            Text('Login', style: TextStyle(fontSize: 16, fontWeight: FontWeight.w600)),
+                          ]),
                         ),
                       ),
                 const SizedBox(height: 24),
@@ -582,30 +409,17 @@ class _LoginScreenState extends State<LoginScreen> {
                 Center(
                   child: TextButton(
                     onPressed: () async {
-                      await Navigator.push(
-                        context,
-                        MaterialPageRoute(
-                            builder: (context) =>
-                                const RegisterScreen()),
-                      );
-                      if (mounted) {
-                        await _loadPrefillName();
-                      }
+                      await Navigator.push(context,
+                          MaterialPageRoute(builder: (context) => const RegisterScreen()));
+                      if (mounted) await _loadPrefillName();
                     },
                     child: RichText(
                       text: TextSpan(
-                        style: const TextStyle(
-                            color: Colors.black, fontSize: 14),
+                        style: const TextStyle(color: Colors.black, fontSize: 14),
                         children: [
-                          const TextSpan(
-                              text: "Don't have an account? "),
-                          TextSpan(
-                            text: 'Register',
-                            style: TextStyle(
-                              color: Colors.yellow[800],
-                              fontWeight: FontWeight.bold,
-                            ),
-                          ),
+                          const TextSpan(text: "Don't have an account? "),
+                          TextSpan(text: 'Register',
+                              style: TextStyle(color: Colors.yellow[800], fontWeight: FontWeight.bold)),
                         ],
                       ),
                     ),
@@ -615,37 +429,22 @@ class _LoginScreenState extends State<LoginScreen> {
                 Center(
                   child: TextButton(
                     onPressed: () {
-                      Navigator.push(
-                        context,
-                        MaterialPageRoute(
-                            builder: (context) =>
-                                const ForgotPasswordScreen()),
-                      );
+                      Navigator.push(context,
+                          MaterialPageRoute(builder: (context) => const ForgotPasswordScreen()));
                     },
-                    child: Text(
-                      'Forgot Password?',
-                      style: TextStyle(
-                          color: Colors.yellow[800],
-                          fontSize: 14,
-                          fontWeight: FontWeight.w500),
-                    ),
+                    child: Text('Forgot Password?',
+                        style: TextStyle(color: Colors.yellow[800], fontSize: 14, fontWeight: FontWeight.w500)),
                   ),
                 ),
 
                 const SizedBox(height: 40),
 
                 Center(
-                  child: Row(
-                    mainAxisAlignment: MainAxisAlignment.center,
-                    children: [
-                      Icon(Icons.local_taxi,
-                          size: 14, color: Colors.yellow[800]),
-                      const SizedBox(width: 6),
-                      Text('Online Taxi Service',
-                          style: TextStyle(
-                              color: Colors.grey[600], fontSize: 12)),
-                    ],
-                  ),
+                  child: Row(mainAxisAlignment: MainAxisAlignment.center, children: [
+                    Icon(Icons.local_taxi, size: 14, color: Colors.yellow[800]),
+                    const SizedBox(width: 6),
+                    Text('Online Taxi Service', style: TextStyle(color: Colors.grey[600], fontSize: 12)),
+                  ]),
                 ),
                 const SizedBox(height: 20),
               ],

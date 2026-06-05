@@ -204,7 +204,6 @@ class _PassengerHomeScreenState extends State<PassengerHomeScreen>
     setState(() => _currentIndex = index);
   }
 
-  // ✅ Get all unique vehicle type names across all routes
   List<String> _getVehicleTypes(List<TaxiRoute> routes) {
     final Set<String> types = {};
     for (final route in routes) {
@@ -222,19 +221,32 @@ class _PassengerHomeScreenState extends State<PassengerHomeScreen>
     final filteredRoutes = _filterRoutes(routeProvider.routes);
     final profilePhoto   = user?.profilePhoto;
 
-    // ✅ Dynamic vehicle types from routes
     final vehicleTypes = _getVehicleTypes(filteredRoutes);
 
     return Scaffold(
       backgroundColor: const Color(0xFFF4F4F6),
       appBar: AppBar(
         backgroundColor: Colors.white, elevation: 0, centerTitle: false, titleSpacing: 20,
-        title: Row(mainAxisSize: MainAxisSize.min, children: [
-          Image.asset('assets/images/taxi_logo.png', width: 36, height: 36, fit: BoxFit.contain),
-          const SizedBox(width: 10),
-          const Text('Easy Ride',
-              style: TextStyle(color: Colors.black87, fontWeight: FontWeight.w800, fontSize: 19, letterSpacing: 0.3)),
-        ]),
+        // ✅ Logo clicks to redirect to home dashboard
+        title: GestureDetector(
+          onTap: () {
+            Navigator.pushAndRemoveUntil(
+              context,
+              PageRouteBuilder(
+                pageBuilder: (_, animation, __) => FadeTransition(
+                    opacity: animation, child: const PassengerHomeScreen()),
+                transitionDuration: const Duration(milliseconds: 300),
+              ),
+              (route) => false,
+            );
+          },
+          child: Row(mainAxisSize: MainAxisSize.min, children: [
+            Image.asset('assets/images/taxi_logo.png', width: 36, height: 36, fit: BoxFit.contain),
+            const SizedBox(width: 10),
+            const Text('Easy Ride',
+                style: TextStyle(color: Colors.black87, fontWeight: FontWeight.w800, fontSize: 19, letterSpacing: 0.3)),
+          ]),
+        ),
         actions: [
           Padding(
             padding: const EdgeInsets.only(right: 12),
@@ -463,7 +475,6 @@ class _PassengerHomeScreenState extends State<PassengerHomeScreen>
                                         : Row(children: [
                                             _dataCell(route.pickupLocation, flex: 3),
                                             _dataCell(route.dropoffLocation, flex: 3),
-                                            // ✅ Dynamic price cells
                                             ...vehicleTypes.map((vt) => _dataCell(
                                               'Nu.${route.getPriceForVehicle(vt)}',
                                               flex: 2,

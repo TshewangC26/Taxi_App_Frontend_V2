@@ -817,21 +817,27 @@ class _DriverAvailableRidesScreenState
         centerTitle: false,
         titleSpacing: 20,
         automaticallyImplyLeading: false,
-        title: Row(mainAxisSize: MainAxisSize.min, children: [
-          Image.asset('assets/images/taxi_logo.png', width: 36, height: 36, fit: BoxFit.contain),
-          const SizedBox(width: 10),
-          const Text('Easy Ride',
-              style: TextStyle(color: Colors.black87, fontWeight: FontWeight.w800, fontSize: 19, letterSpacing: 0.3)),
-        ]),
+       title: GestureDetector(
+          onTap: () {
+            Navigator.pushAndRemoveUntil(
+              context,
+              PageRouteBuilder(
+                pageBuilder: (_, animation, __) => FadeTransition(
+                    opacity: animation, child: const DriverHomeScreen()),
+                transitionDuration: const Duration(milliseconds: 300),
+              ),
+              (route) => false,
+            );
+          },
+          child: Row(mainAxisSize: MainAxisSize.min, children: [
+            Image.asset('assets/images/taxi_logo.png', width: 36, height: 36, fit: BoxFit.contain),
+            const SizedBox(width: 10),
+            const Text('Easy Ride',
+                style: TextStyle(color: Colors.black87, fontWeight: FontWeight.w800, fontSize: 19, letterSpacing: 0.3)),
+          ]),
+        ),
         actions: [
-          InkWell(
-            onTap: () { dp.getAvailableBookings(); _startDriverLocationTracking(); },
-            borderRadius: BorderRadius.circular(8),
-            child: Padding(
-              padding: const EdgeInsets.all(8),
-              child: Icon(Icons.refresh_rounded, color: Colors.grey[600], size: 20),
-            ),
-          ),
+         
           // ✅ Hamburger menu replaces logout button
           Padding(
             padding: const EdgeInsets.only(right: 12, left: 4),

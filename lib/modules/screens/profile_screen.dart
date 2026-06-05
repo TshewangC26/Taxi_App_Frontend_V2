@@ -277,12 +277,25 @@ class _ProfileScreenState extends State<ProfileScreen>
         centerTitle: false,
         titleSpacing: 20,
         automaticallyImplyLeading: false,
-        title: Row(mainAxisSize: MainAxisSize.min, children: [
-          Image.asset('assets/images/taxi_logo.png', width: 36, height: 36, fit: BoxFit.contain),
-          const SizedBox(width: 10),
-          const Text('Easy Ride',
-              style: TextStyle(color: Colors.black87, fontWeight: FontWeight.w800, fontSize: 19, letterSpacing: 0.3)),
-        ]),
+       title: GestureDetector(
+          onTap: () {
+            Navigator.pushAndRemoveUntil(
+              context,
+              PageRouteBuilder(
+                pageBuilder: (_, animation, __) => FadeTransition(
+                    opacity: animation, child: const PassengerHomeScreen()),
+                transitionDuration: const Duration(milliseconds: 300),
+              ),
+              (route) => false,
+            );
+          },
+          child: Row(mainAxisSize: MainAxisSize.min, children: [
+            Image.asset('assets/images/taxi_logo.png', width: 36, height: 36, fit: BoxFit.contain),
+            const SizedBox(width: 10),
+            const Text('Easy Ride',
+                style: TextStyle(color: Colors.black87, fontWeight: FontWeight.w800, fontSize: 19, letterSpacing: 0.3)),
+          ]),
+        ),
         actions: [
           // ✅ Hamburger menu
           Padding(
@@ -431,17 +444,27 @@ class _ProfileScreenState extends State<ProfileScreen>
                             },
                           ),
                           Divider(height: 1, indent: 56, color: Colors.grey.shade100),
-                          _buildActionRow(
+                         _buildActionRow(
                             icon: Icons.lock_outline_rounded,
                             label: 'Change Password',
                             iconBg: Colors.orange[50]!,
                             iconColor: Colors.orange[700]!,
                             isFirst: false,
-                            isLast: true,
+                            isLast: false,
                             onTap: () {
                               Navigator.push(context,
                                   MaterialPageRoute(builder: (_) => ChangePasswordScreen()));
                             },
+                          ),
+                          Divider(height: 1, indent: 56, color: Colors.grey.shade100),
+                          _buildActionRow(
+                            icon: Icons.logout_rounded,
+                            label: 'Logout',
+                            iconBg: Colors.red[50]!,
+                            iconColor: Colors.red[400]!,
+                            isFirst: false,
+                            isLast: true,
+                            onTap: _confirmLogout,
                           ),
                         ]),
                       ),

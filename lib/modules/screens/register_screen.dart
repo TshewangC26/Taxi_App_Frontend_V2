@@ -57,6 +57,65 @@ class VehicleNumberFormatter extends TextInputFormatter {
   }
 }
 
+// ✅ Auto-formatter for Bhutan Phone: +975 17 123 456
+class BhutanPhoneFormatter extends TextInputFormatter {
+  @override
+  TextEditingValue formatEditUpdate(
+      TextEditingValue oldValue, TextEditingValue newValue) {
+
+    // If user is deleting and text is just '+975' or less, allow empty
+    if (newValue.text.isEmpty || newValue.text == '+' ||
+        newValue.text == '+9' || newValue.text == '+97' ||
+        newValue.text == '+975' || newValue.text == '+975 ') {
+      return const TextEditingValue(
+        text: '',
+        selection: TextSelection.collapsed(offset: 0),
+      );
+    }
+
+    // Strip everything except digits
+    String raw = newValue.text.replaceAll(RegExp(r'[^0-9]'), '');
+
+    // Remove leading 975 if user typed it
+    if (raw.startsWith('975')) {
+      raw = raw.substring(3);
+    }
+
+    // If nothing left after stripping, return empty
+    if (raw.isEmpty) {
+      return const TextEditingValue(
+        text: '',
+        selection: TextSelection.collapsed(offset: 0),
+      );
+    }
+
+    // Limit to 8 digits
+    if (raw.length > 8) {
+      raw = raw.substring(0, 8);
+    }
+
+   // Build formatted string
+    String formatted = '+975';
+    if (raw.length >= 1) {
+      formatted += ' ';
+      formatted += raw.substring(0, raw.length >= 2 ? 2 : raw.length);
+    }
+    if (raw.length >= 3) {
+      formatted += ' ';
+      formatted += raw.substring(2, raw.length >= 5 ? 5 : raw.length);
+    }
+    if (raw.length >= 6) {
+      formatted += ' ';
+      formatted += raw.substring(5, raw.length >= 8 ? 8 : raw.length);
+    }
+
+    return TextEditingValue(
+      text: formatted,
+      selection: TextSelection.collapsed(offset: formatted.length),
+    );
+  }
+}
+
 class RegisterScreen extends StatefulWidget {
   const RegisterScreen({super.key});
 
@@ -138,7 +197,6 @@ class _RegisterScreenState extends State<RegisterScreen>
     }
   }
 
-  // ✅ Pick license image from camera or gallery
   Future<void> _pickLicenseImage(ImageSource source) async {
     final picked = await _imagePicker.pickImage(
       source: source,
@@ -149,7 +207,6 @@ class _RegisterScreenState extends State<RegisterScreen>
     }
   }
 
-  // ✅ Show image source picker
   void _showImageSourceDialog() {
     showModalBottomSheet(
       context: context,
@@ -174,7 +231,6 @@ class _RegisterScreenState extends State<RegisterScreen>
             const Text('Upload License Photo',
                 style: TextStyle(fontSize: 16, fontWeight: FontWeight.w700, color: Colors.black87)),
             const SizedBox(height: 16),
-            // Camera option
             InkWell(
               onTap: () {
                 Navigator.pop(ctx);
@@ -191,10 +247,7 @@ class _RegisterScreenState extends State<RegisterScreen>
                 child: Row(children: [
                   Container(
                     width: 44, height: 44,
-                    decoration: BoxDecoration(
-                      color: Colors.yellow[50],
-                      borderRadius: BorderRadius.circular(12),
-                    ),
+                    decoration: BoxDecoration(color: Colors.yellow[50], borderRadius: BorderRadius.circular(12)),
                     child: Icon(Icons.camera_alt_rounded, color: Colors.yellow[800], size: 22),
                   ),
                   const SizedBox(width: 14),
@@ -210,7 +263,6 @@ class _RegisterScreenState extends State<RegisterScreen>
               ),
             ),
             const SizedBox(height: 10),
-            // Gallery option
             InkWell(
               onTap: () {
                 Navigator.pop(ctx);
@@ -227,10 +279,7 @@ class _RegisterScreenState extends State<RegisterScreen>
                 child: Row(children: [
                   Container(
                     width: 44, height: 44,
-                    decoration: BoxDecoration(
-                      color: Colors.yellow[50],
-                      borderRadius: BorderRadius.circular(12),
-                    ),
+                    decoration: BoxDecoration(color: Colors.yellow[50], borderRadius: BorderRadius.circular(12)),
                     child: Icon(Icons.photo_library_rounded, color: Colors.yellow[800], size: 22),
                   ),
                   const SizedBox(width: 14),
@@ -342,7 +391,6 @@ class _RegisterScreenState extends State<RegisterScreen>
 
   Future<void> _register() async {
     if (_formKey.currentState!.validate()) {
-      // ✅ Check license image is uploaded for driver
       if (_userType == 'driver' && _licenseImage == null) {
         _showErrorDialog('Please upload a photo of your license.');
         return;
@@ -359,7 +407,7 @@ class _RegisterScreenState extends State<RegisterScreen>
         vehicleType: _userType == 'driver' ? _vehicleType : null,
         vehicleNumber: _userType == 'driver' ? _vehicleNumberController.text.trim() : null,
         licenseNumber: _userType == 'driver' ? _licenseNumberController.text.trim() : null,
-        licenseImagePath: _userType == 'driver' ? _licenseImage?.path : null, // ✅ pass image
+        licenseImagePath: _userType == 'driver' ? _licenseImage?.path : null,
       );
 
       if (success && mounted) {
@@ -536,10 +584,32 @@ class _RegisterScreenState extends State<RegisterScreen>
                   ),
                   const SizedBox(height: 14),
 
+                  // ✅ Phone — Bhutan format for driver, free for passenger
                   _buildField(
-                    controller: _phoneController, label: 'Phone Number', icon: Icons.phone_outlined,
+                    controller: _phoneController,
+                    label: 'Phone Number',
+                    icon: Icons.phone_outlined,
+                    hint: _userType == 'driver' ? 'e.g. +975 17 123 456' : null,
                     keyboardType: TextInputType.phone,
-                    validator: (value) => (value == null || value.isEmpty) ? 'Please enter your phone number' : null,
+                    inputFormatters: _userType == 'driver' ? [BhutanPhoneFormatter()] : null,
+                   validator: (value) {
+                      if (value == null || value.isEmpty) return 'Please enter your phone number';
+                      if (_userType == 'driver') {
+                        final digits = value.replaceAll(RegExp(r'[^0-9]'), '');
+                        // After stripping +975, should have 8 digits
+                        final localDigits = digits.startsWith('975') ? digits.substring(3) : digits;
+                        if (localDigits.length != 8) {
+                          return 'Enter a valid Bhutan number e.g. +975 17 123 456';
+                        }
+                        // ✅ Must start with 16, 17, or 77
+                        if (!localDigits.startsWith('16') &&
+                            !localDigits.startsWith('17') &&
+                            !localDigits.startsWith('77')) {
+                          return 'Number must start with 16, 17, or 77';
+                        }
+                      }
+                      return null;
+                    },
                   ),
                   const SizedBox(height: 20),
 
@@ -550,13 +620,23 @@ class _RegisterScreenState extends State<RegisterScreen>
                     Expanded(child: _TypeCard(
                       label: 'Passenger', icon: Icons.airline_seat_recline_normal,
                       selected: _userType == 'passenger',
-                      onTap: () => setState(() => _userType = 'passenger'),
+                      onTap: () {
+                        setState(() {
+                          _userType = 'passenger';
+                          _phoneController.clear();
+                        });
+                      },
                     )),
                     const SizedBox(width: 12),
                     Expanded(child: _TypeCard(
                       label: 'Driver', icon: Icons.drive_eta_outlined,
                       selected: _userType == 'driver',
-                      onTap: () => setState(() => _userType = 'driver'),
+                      onTap: () {
+                        setState(() {
+                          _userType = 'driver';
+                          _phoneController.clear();
+                        });
+                      },
                     )),
                   ]),
 
@@ -565,7 +645,6 @@ class _RegisterScreenState extends State<RegisterScreen>
                     _sectionHeader('Driver Information', Icons.directions_car_outlined),
                     const SizedBox(height: 14),
 
-                    // ✅ Dynamic vehicle type selector
                     Container(
                       padding: const EdgeInsets.all(14),
                       decoration: BoxDecoration(
@@ -620,7 +699,7 @@ class _RegisterScreenState extends State<RegisterScreen>
                       controller: _vehicleNumberController,
                       label: 'Vehicle Number',
                       icon: Icons.confirmation_number_outlined,
-                      hint: 'e.g. BP1B6884 → BP-1-B6884',
+                      hint: 'e.g. BT1B6884 → BT-1-B6884',
                       keyboardType: TextInputType.text,
                       inputFormatters: [VehicleNumberFormatter()],
                       validator: (value) => (_userType == 'driver' && (value == null || value.isEmpty))
@@ -664,8 +743,6 @@ class _RegisterScreenState extends State<RegisterScreen>
                             ),
                         ]),
                         const SizedBox(height: 12),
-
-                        // ✅ Show image preview or upload button
                         if (_licenseImage != null)
                           ClipRRect(
                             borderRadius: BorderRadius.circular(10),
@@ -685,10 +762,7 @@ class _RegisterScreenState extends State<RegisterScreen>
                               decoration: BoxDecoration(
                                 color: Colors.yellow[50],
                                 borderRadius: BorderRadius.circular(10),
-                                border: Border.all(
-                                  color: Colors.yellow[200]!,
-                                  style: BorderStyle.solid,
-                                ),
+                                border: Border.all(color: Colors.yellow[200]!, style: BorderStyle.solid),
                               ),
                               child: Column(
                                 mainAxisAlignment: MainAxisAlignment.center,
@@ -704,7 +778,6 @@ class _RegisterScreenState extends State<RegisterScreen>
                               ),
                             ),
                           ),
-
                         if (_licenseImage != null) ...[
                           const SizedBox(height: 10),
                           GestureDetector(

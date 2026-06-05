@@ -511,11 +511,24 @@ class _BookRideScreenState extends State<BookRideScreen>
       appBar: AppBar(
         backgroundColor: Colors.white, elevation: 0, centerTitle: false,
         titleSpacing: 20, automaticallyImplyLeading: false,
-        title: Row(mainAxisSize: MainAxisSize.min, children: [
-          Image.asset('assets/images/taxi_logo.png', width: 36, height: 36, fit: BoxFit.contain),
-          const SizedBox(width: 10),
-          const Text('Easy Ride', style: TextStyle(color: Colors.black87, fontWeight: FontWeight.w800, fontSize: 19, letterSpacing: 0.3)),
-        ]),
+        title: GestureDetector(
+          onTap: () {
+            Navigator.pushAndRemoveUntil(
+              context,
+              PageRouteBuilder(
+                pageBuilder: (_, animation, __) => FadeTransition(
+                    opacity: animation, child: const PassengerHomeScreen()),
+                transitionDuration: const Duration(milliseconds: 300),
+              ),
+              (route) => false,
+            );
+          },
+          child: Row(mainAxisSize: MainAxisSize.min, children: [
+            Image.asset('assets/images/taxi_logo.png', width: 36, height: 36, fit: BoxFit.contain),
+            const SizedBox(width: 10),
+            const Text('Easy Ride', style: TextStyle(color: Colors.black87, fontWeight: FontWeight.w800, fontSize: 19, letterSpacing: 0.3)),
+          ]),
+        ),
         actions: [
           Padding(
             padding: const EdgeInsets.only(right: 12),

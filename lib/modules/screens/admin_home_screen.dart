@@ -182,16 +182,26 @@ class _AdminHomeScreenState extends State<AdminHomeScreen>
                   const SizedBox(width: 12),
                   Expanded(child: ElevatedButton(
                     onPressed: () async {
+                      // ✅ Validate fields
                       if (currentCtrl.text.isEmpty || newCtrl.text.isEmpty || confirmCtrl.text.isEmpty) {
-                        ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: const Text('Please fill all fields'), backgroundColor: Colors.grey[800]));
-                        return;
-                      }
-                      if (newCtrl.text != confirmCtrl.text) {
-                        ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: const Text('New passwords do not match!'), backgroundColor: Colors.grey[800]));
+                        await showDialog(
+                          context: context, barrierDismissible: true, barrierColor: Colors.black.withOpacity(0.5),
+                          builder: (ctx) => _errorDialog(ctx, 'Missing Fields', 'Please fill in all password fields.'),
+                        );
                         return;
                       }
                       if (newCtrl.text.length < 12) {
-                        ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: const Text('Password must be at least 12 characters'), backgroundColor: Colors.grey[800]));
+                        await showDialog(
+                          context: context, barrierDismissible: true, barrierColor: Colors.black.withOpacity(0.5),
+                          builder: (ctx) => _errorDialog(ctx, 'Password Too Short', 'New password must be at least 12 characters long.'),
+                        );
+                        return;
+                      }
+                      if (newCtrl.text != confirmCtrl.text) {
+                        await showDialog(
+                          context: context, barrierDismissible: true, barrierColor: Colors.black.withOpacity(0.5),
+                          builder: (ctx) => _errorDialog(ctx, 'Passwords Do Not Match', 'New password and confirm password must be the same.'),
+                        );
                         return;
                       }
                       try {
@@ -202,11 +212,17 @@ class _AdminHomeScreenState extends State<AdminHomeScreen>
                         });
                         if (ctx.mounted) Navigator.pop(ctx);
                         if (context.mounted) {
-                          ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: const Text('Password changed successfully!'), backgroundColor: Colors.yellow[800]));
+                          ScaffoldMessenger.of(context).showSnackBar(SnackBar(
+                            content: const Text('Password changed successfully!'),
+                            backgroundColor: Colors.yellow[800],
+                          ));
                         }
                       } catch (e) {
                         if (context.mounted) {
-                          ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: const Text('Failed: Wrong current password!'), backgroundColor: Colors.grey[800]));
+                          await showDialog(
+                            context: context, barrierDismissible: true, barrierColor: Colors.black.withOpacity(0.5),
+                            builder: (ctx) => _errorDialog(ctx, 'Wrong Password', 'Your current password is incorrect.\nPlease try again.'),
+                          );
                         }
                       }
                     },
@@ -220,6 +236,40 @@ class _AdminHomeScreenState extends State<AdminHomeScreen>
             ),
           ),
         ),
+      ),
+    );
+  }
+
+ // ✅ Reusable error dialog
+  Widget _errorDialog(BuildContext ctx, String title, String message) {
+    return Dialog(
+      backgroundColor: Colors.transparent, elevation: 0,
+      child: Container(
+        padding: const EdgeInsets.all(28),
+        decoration: BoxDecoration(color: Colors.white, borderRadius: BorderRadius.circular(24)),
+        child: Column(mainAxisSize: MainAxisSize.min, children: [
+          Stack(alignment: Alignment.center, children: [
+            Container(width: 80, height: 80, decoration: BoxDecoration(color: Colors.yellow[50], shape: BoxShape.circle)),
+            Container(width: 62, height: 62, decoration: BoxDecoration(color: Colors.yellow[100], shape: BoxShape.circle)),
+            Container(width: 46, height: 46,
+                decoration: BoxDecoration(color: Colors.yellow[800], shape: BoxShape.circle),
+                child: const Icon(Icons.error_outline_rounded, color: Colors.white, size: 22)),
+          ]),
+          const SizedBox(height: 20),
+          Text(title, style: const TextStyle(fontSize: 20, fontWeight: FontWeight.w800, color: Colors.black87)),
+          const SizedBox(height: 8),
+          Text(message, textAlign: TextAlign.center,
+              style: TextStyle(fontSize: 14, color: Colors.grey[500], height: 1.5)),
+          const SizedBox(height: 28),
+          SizedBox(width: double.infinity, height: 50,
+            child: ElevatedButton(
+              onPressed: () => Navigator.of(ctx).pop(),
+              style: ElevatedButton.styleFrom(backgroundColor: Colors.yellow[800], foregroundColor: Colors.white,
+                  elevation: 0, shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(14))),
+              child: const Text('OK', style: TextStyle(fontSize: 15, fontWeight: FontWeight.w600)),
+            ),
+          ),
+        ]),
       ),
     );
   }
@@ -261,11 +311,25 @@ class _AdminHomeScreenState extends State<AdminHomeScreen>
       appBar: AppBar(
         backgroundColor: Colors.white, elevation: 0, centerTitle: false,
         titleSpacing: 20, automaticallyImplyLeading: false,
-        title: Row(mainAxisSize: MainAxisSize.min, children: [
-          Image.asset('assets/images/taxi_logo.png', width: 36, height: 36, fit: BoxFit.contain),
-          const SizedBox(width: 10),
-          const Text('Easy Ride', style: TextStyle(color: Colors.black87, fontWeight: FontWeight.w800, fontSize: 19, letterSpacing: 0.3)),
-        ]),
+        // ✅ Logo clicks to redirect to admin home dashboard
+        title: GestureDetector(
+          onTap: () {
+            Navigator.pushAndRemoveUntil(
+              context,
+              PageRouteBuilder(
+                pageBuilder: (_, animation, __) => FadeTransition(
+                    opacity: animation, child: const AdminHomeScreen()),
+                transitionDuration: const Duration(milliseconds: 300),
+              ),
+              (route) => false,
+            );
+          },
+          child: Row(mainAxisSize: MainAxisSize.min, children: [
+            Image.asset('assets/images/taxi_logo.png', width: 36, height: 36, fit: BoxFit.contain),
+            const SizedBox(width: 10),
+            const Text('Easy Ride', style: TextStyle(color: Colors.black87, fontWeight: FontWeight.w800, fontSize: 19, letterSpacing: 0.3)),
+          ]),
+        ),
         actions: [
           Padding(
             padding: const EdgeInsets.only(right: 12),
@@ -408,7 +472,6 @@ class _AdminHomeScreenState extends State<AdminHomeScreen>
                       iconColor: Colors.yellow[800]!,
                       onTap: _showChangePasswordDialog,
                     ),
-                    // ✅ New Vehicle Types card
                     _buildMenuCard(
                       icon: Icons.directions_car_rounded,
                       label: 'Vehicle Types',

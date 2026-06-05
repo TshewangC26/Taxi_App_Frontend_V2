@@ -17,6 +17,8 @@ class Booking {
   final double? passengerLongitude;
   // ✅ Rating field
   final int? rating;
+    // ✅ Driver phone for contact
+  final String? driverPhone;
 
   Booking({
     required this.id,
@@ -36,6 +38,7 @@ class Booking {
     this.passengerLatitude,
     this.passengerLongitude,
     this.rating,
+    this.driverPhone,
   });
 
   factory Booking.fromJson(Map<String, dynamic> json) {
@@ -64,6 +67,7 @@ class Booking {
       rating: json['rating'] != null
           ? int.tryParse(json['rating'].toString())
           : null,
+      driverPhone: json['driver_phone']?.toString(),
     );
   }
 
@@ -86,6 +90,7 @@ class Booking {
       'passenger_latitude':  passengerLatitude,
       'passenger_longitude': passengerLongitude,
       'rating':              rating,
+      'driver_phone':        driverPhone,
     };
   }
 }

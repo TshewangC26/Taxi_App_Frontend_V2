@@ -1,3 +1,4 @@
+import 'dart:async';
 import 'package:flutter/material.dart';
 import 'package:provider/provider.dart';
 import '../providers/auth_provider.dart';
@@ -6,7 +7,7 @@ import 'driver_available_rides_screen.dart';
 import 'driver_my_rides_screen.dart';
 import 'driver_earnings_screen.dart';
 import 'driver_payment_details_screen.dart';
-import 'driver_profile_screen.dart';
+import 'driver_profile_screen.dart' as profile;
 import 'login_screens.dart';
 import 'contact_us_screen.dart';
 import 'about_us_screen.dart';
@@ -21,6 +22,7 @@ class DriverHomeScreen extends StatefulWidget {
 class _DriverHomeScreenState extends State<DriverHomeScreen>
     with SingleTickerProviderStateMixin {
   final int _currentIndex = 0;
+  Timer? _countdownTimer;
 
   late AnimationController _animController;
   late Animation<double> _fadeAnim;
@@ -49,13 +51,72 @@ class _DriverHomeScreenState extends State<DriverHomeScreen>
     WidgetsBinding.instance.addPostFrameCallback((_) {
       Provider.of<DriverProvider>(context, listen: false).getProfile();
       Provider.of<DriverProvider>(context, listen: false).getAvailableBookings();
+      Provider.of<DriverProvider>(context, listen: false).getMyRides();
+    });
+
+    _countdownTimer = Timer.periodic(const Duration(minutes: 1), (_) {
+      if (mounted) setState(() {});
     });
   }
 
   @override
   void dispose() {
+    _countdownTimer?.cancel();
     _animController.dispose();
     super.dispose();
+  }
+
+  String _getCountdown(String dateStr, String timeStr) {
+    try {
+      final parts = timeStr.split(':');
+      final hour = int.parse(parts[0]);
+      final minute = int.parse(parts[1]);
+      final scheduledDateTime = DateTime.parse(dateStr).copyWith(hour: hour, minute: minute);
+      final now = DateTime.now();
+      final diff = scheduledDateTime.difference(now);
+      if (diff.isNegative) return 'Time has passed';
+      if (diff.inDays > 0) return '${diff.inDays} day${diff.inDays > 1 ? 's' : ''} left';
+      if (diff.inHours > 0) return '${diff.inHours} hour${diff.inHours > 1 ? 's' : ''} left';
+      if (diff.inMinutes > 0) return '${diff.inMinutes} minute${diff.inMinutes > 1 ? 's' : ''} left';
+      return 'Starting now!';
+    } catch (_) {
+      return '';
+    }
+  }
+
+  Color _getCountdownColor(String dateStr, String timeStr) {
+    try {
+      final parts = timeStr.split(':');
+      final hour = int.parse(parts[0]);
+      final minute = int.parse(parts[1]);
+      final scheduledDateTime = DateTime.parse(dateStr).copyWith(hour: hour, minute: minute);
+      final diff = scheduledDateTime.difference(DateTime.now());
+      if (diff.inHours < 1) return Colors.red;
+      if (diff.inHours < 3) return Colors.orange;
+      return const Color(0xFF2E7D32);
+    } catch (_) {
+      return Colors.grey;
+    }
+  }
+
+  String _formatScheduledDate(String dateStr) {
+    try {
+      final date = DateTime.parse(dateStr);
+      const days = ['Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat', 'Sun'];
+      const months = ['Jan', 'Feb', 'Mar', 'Apr', 'May', 'Jun', 'Jul', 'Aug', 'Sep', 'Oct', 'Nov', 'Dec'];
+      return '${days[date.weekday - 1]}, ${date.day} ${months[date.month - 1]} ${date.year}';
+    } catch (_) { return dateStr; }
+  }
+
+  String _formatScheduledTime(String timeStr) {
+    try {
+      final parts = timeStr.split(':');
+      final hour = int.parse(parts[0]);
+      final minute = parts[1].padLeft(2, '0');
+      final period = hour >= 12 ? 'PM' : 'AM';
+      final displayHour = hour > 12 ? hour - 12 : (hour == 0 ? 12 : hour);
+      return '$displayHour:$minute $period';
+    } catch (_) { return timeStr; }
   }
 
   void _onNavTap(int index) {
@@ -73,12 +134,11 @@ class _DriverHomeScreenState extends State<DriverHomeScreen>
       return;
     }
     if (index == 4) {
-      Navigator.push(context, MaterialPageRoute(builder: (_) => const DriverProfileScreen()));
+      Navigator.push(context, MaterialPageRoute(builder: (_) => const profile.DriverProfileScreen()));
       return;
     }
   }
 
-  // ── Hamburger menu bottom sheet ───────────────────────────────
   void _openMenu() {
     showModalBottomSheet(
       context: context,
@@ -92,17 +152,11 @@ class _DriverHomeScreenState extends State<DriverHomeScreen>
         child: Column(
           mainAxisSize: MainAxisSize.min,
           children: [
-            // Handle bar
             Container(
               width: 40, height: 4,
-              decoration: BoxDecoration(
-                color: Colors.grey[300],
-                borderRadius: BorderRadius.circular(2),
-              ),
+              decoration: BoxDecoration(color: Colors.grey[300], borderRadius: BorderRadius.circular(2)),
             ),
             const SizedBox(height: 20),
-
-            // ── Contact Us ──
             _menuItem(
               icon: Icons.headset_mic_rounded,
               iconColor: Colors.yellow[800]!,
@@ -111,13 +165,10 @@ class _DriverHomeScreenState extends State<DriverHomeScreen>
               subtitle: 'Get in touch with our support team',
               onTap: () {
                 Navigator.pop(ctx);
-                Navigator.push(context,
-                    MaterialPageRoute(builder: (_) => const ContactUsScreen()));
+                Navigator.push(context, MaterialPageRoute(builder: (_) => const ContactUsScreen()));
               },
             ),
             Divider(height: 1, color: Colors.grey.shade100),
-
-            // ── About Us ──
             _menuItem(
               icon: Icons.info_outline_rounded,
               iconColor: Colors.blue[700]!,
@@ -126,13 +177,10 @@ class _DriverHomeScreenState extends State<DriverHomeScreen>
               subtitle: 'Learn more about Easy Ride',
               onTap: () {
                 Navigator.pop(ctx);
-                Navigator.push(context,
-                    MaterialPageRoute(builder: (_) => const AboutUsScreen()));
+                Navigator.push(context, MaterialPageRoute(builder: (_) => const AboutUsScreen()));
               },
             ),
             Divider(height: 1, color: Colors.grey.shade100),
-
-            // ── Logout ──
             _menuItem(
               icon: Icons.logout_rounded,
               iconColor: Colors.red[400]!,
@@ -172,8 +220,7 @@ class _DriverHomeScreenState extends State<DriverHomeScreen>
           const SizedBox(width: 14),
           Expanded(
             child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
-              Text(title,
-                  style: const TextStyle(fontSize: 15, fontWeight: FontWeight.w700, color: Colors.black87)),
+              Text(title, style: const TextStyle(fontSize: 15, fontWeight: FontWeight.w700, color: Colors.black87)),
               const SizedBox(height: 2),
               Text(subtitle, style: TextStyle(fontSize: 12, color: Colors.grey[500])),
             ]),
@@ -184,7 +231,6 @@ class _DriverHomeScreenState extends State<DriverHomeScreen>
     );
   }
 
-  // ── Logout confirmation dialog ────────────────────────────────
   Future<void> _confirmLogout() async {
     final confirmed = await showDialog<bool>(
       context: context,
@@ -198,10 +244,8 @@ class _DriverHomeScreenState extends State<DriverHomeScreen>
           decoration: BoxDecoration(color: Colors.white, borderRadius: BorderRadius.circular(24)),
           child: Column(mainAxisSize: MainAxisSize.min, children: [
             Stack(alignment: Alignment.center, children: [
-              Container(width: 80, height: 80,
-                  decoration: BoxDecoration(color: Colors.yellow[50], shape: BoxShape.circle)),
-              Container(width: 62, height: 62,
-                  decoration: BoxDecoration(color: Colors.yellow[100], shape: BoxShape.circle)),
+              Container(width: 80, height: 80, decoration: BoxDecoration(color: Colors.yellow[50], shape: BoxShape.circle)),
+              Container(width: 62, height: 62, decoration: BoxDecoration(color: Colors.yellow[100], shape: BoxShape.circle)),
               Container(width: 46, height: 46,
                   decoration: BoxDecoration(color: Colors.yellow[800], shape: BoxShape.circle),
                   child: const Icon(Icons.logout_rounded, color: Colors.white, size: 22)),
@@ -309,6 +353,21 @@ class _DriverHomeScreenState extends State<DriverHomeScreen>
     final profilePhoto   = user?.profilePhoto;
     final totalPending   = driverProvider.nowBookings.length + driverProvider.scheduledBookings.length;
 
+    // ✅ Combine all scheduled bookings from both sources, hide completed/cancelled
+    final allScheduled = [
+      ...driverProvider.scheduledBookings,
+      ...driverProvider.myRides.where((b) => b['booking_type'] == 'scheduled'),
+    ];
+    final seen = <int>{};
+    final scheduledBookings = allScheduled.where((b) {
+      final id = b['id'] as int? ?? 0;
+      final bStatus = b['status'] ?? '';
+      if (seen.contains(id)) return false;
+      if (bStatus == 'completed' || bStatus == 'cancelled') return false;
+      seen.add(id);
+      return true;
+    }).toList();
+
     return Scaffold(
       backgroundColor: const Color(0xFFF4F4F6),
       appBar: AppBar(
@@ -316,17 +375,29 @@ class _DriverHomeScreenState extends State<DriverHomeScreen>
         elevation: 0,
         centerTitle: false,
         titleSpacing: 20,
-        title: Row(
-          mainAxisSize: MainAxisSize.min,
-          children: [
-            Image.asset('assets/images/taxi_logo.png', width: 36, height: 36, fit: BoxFit.contain),
-            const SizedBox(width: 10),
-            const Text('Easy Ride',
-                style: TextStyle(color: Colors.black87, fontWeight: FontWeight.w800, fontSize: 19, letterSpacing: 0.3)),
-          ],
+        title: GestureDetector(
+          onTap: () {
+            Navigator.pushAndRemoveUntil(
+              context,
+              PageRouteBuilder(
+                pageBuilder: (_, animation, __) => FadeTransition(
+                    opacity: animation, child: const DriverHomeScreen()),
+                transitionDuration: const Duration(milliseconds: 300),
+              ),
+              (route) => false,
+            );
+          },
+          child: Row(
+            mainAxisSize: MainAxisSize.min,
+            children: [
+              Image.asset('assets/images/taxi_logo.png', width: 36, height: 36, fit: BoxFit.contain),
+              const SizedBox(width: 10),
+              const Text('Easy Ride',
+                  style: TextStyle(color: Colors.black87, fontWeight: FontWeight.w800, fontSize: 19, letterSpacing: 0.3)),
+            ],
+          ),
         ),
         actions: [
-          // ✅ Hamburger menu icon instead of Logout button
           Padding(
             padding: const EdgeInsets.only(right: 12),
             child: InkWell(
@@ -564,146 +635,142 @@ class _DriverHomeScreenState extends State<DriverHomeScreen>
                   ),
                 ],
 
+                // ── SCHEDULED BOOKINGS REMINDER ───────────────
                 const SizedBox(height: 24),
-
-                // ── QUICK ACTIONS ─────────────────────────────
-                const _SectionLabel(title: 'Quick Actions'),
+                Row(children: [
+                  Container(
+                    padding: const EdgeInsets.all(7),
+                    decoration: BoxDecoration(color: Colors.yellow[800], borderRadius: BorderRadius.circular(9)),
+                    child: const Icon(Icons.calendar_today_rounded, color: Colors.white, size: 15),
+                  ),
+                  const SizedBox(width: 10),
+                  const Text('Scheduled Rides',
+                      style: TextStyle(fontSize: 15, fontWeight: FontWeight.w700, color: Colors.black87)),
+                ]),
                 const SizedBox(height: 12),
 
-                Row(children: [
-                  Expanded(
-                    child: _ActionCard(
-                      icon: Icons.list_alt_rounded,
-                      label: 'Available\nRides',
-                      iconColor: Colors.white,
-                      bgColor: Colors.yellow[800]!,
-                      badge: totalPending,
-                      onTap: () => Navigator.push(context,
-                          MaterialPageRoute(builder: (_) => const DriverAvailableRidesScreen())),
+                if (scheduledBookings.isEmpty)
+                  Container(
+                    width: double.infinity,
+                    padding: const EdgeInsets.symmetric(vertical: 28),
+                    decoration: BoxDecoration(
+                      color: Colors.white,
+                      borderRadius: BorderRadius.circular(16),
+                      border: Border.all(color: Colors.grey.shade100),
                     ),
-                  ),
-                  const SizedBox(width: 12),
-                  Expanded(
-                    child: _ActionCard(
-                      icon: Icons.history_rounded,
-                      label: 'My Rides',
-                      iconColor: Colors.white,
-                      bgColor: const Color(0xFF455A64),
+                    child: Column(children: [
+                      Icon(Icons.calendar_today_rounded, size: 36, color: Colors.grey[300]),
+                      const SizedBox(height: 10),
+                      Text('No scheduled rides',
+                          style: TextStyle(fontSize: 14, fontWeight: FontWeight.w600, color: Colors.grey[500])),
+                      const SizedBox(height: 4),
+                      Text('Accepted scheduled rides will appear here',
+                          style: TextStyle(fontSize: 12, color: Colors.grey[400])),
+                    ]),
+                  )
+                else
+                  ...scheduledBookings.map((booking) {
+                    final dateStr = booking['scheduled_date'] ?? '';
+                    final timeStr = booking['scheduled_time'] ?? '';
+                    final countdown = _getCountdown(dateStr, timeStr);
+                    final countdownColor = _getCountdownColor(dateStr, timeStr);
+                    final pickup = booking['pickup_location'] ?? '';
+                    final dropoff = booking['dropoff_location'] ?? '';
+                    final passengerName = booking['passenger']?['name'] ?? 'Passenger';
+
+                    return InkWell(
                       onTap: () => Navigator.push(context,
                           MaterialPageRoute(builder: (_) => const DriverMyRidesScreen())),
-                    ),
-                  ),
-                  const SizedBox(width: 12),
-                  Expanded(
-                    child: _ActionCard(
-                      icon: Icons.account_balance_wallet_rounded,
-                      label: 'Earnings',
-                      iconColor: Colors.white,
-                      bgColor: const Color(0xFF00695C),
-                      onTap: () => Navigator.push(context,
-                          MaterialPageRoute(builder: (_) => const DriverEarningsScreen())),
-                    ),
-                  ),
-                ]),
-
-                const SizedBox(height: 12),
-
-                Row(children: [
-                  Expanded(
-                    child: _ActionCard(
-                      icon: Icons.payment_rounded,
-                      label: 'Payment\nDetails',
-                      iconColor: Colors.white,
-                      bgColor: const Color(0xFF283593),
-                      onTap: () => Navigator.push(context,
-                          MaterialPageRoute(builder: (_) => const DriverPaymentDetailsScreen())),
-                    ),
-                  ),
-                  const SizedBox(width: 12),
-                  Expanded(
-                    child: _ActionCard(
-                      icon: Icons.person_outline_rounded,
-                      label: 'Profile',
-                      iconColor: Colors.white,
-                      bgColor: const Color(0xFF546E7A),
-                      onTap: () => Navigator.push(context,
-                          MaterialPageRoute(builder: (_) => const DriverProfileScreen())),
-                    ),
-                  ),
-                  const Expanded(child: SizedBox()),
-                ]),
+                      borderRadius: BorderRadius.circular(16),
+                      child: Container(
+                        width: double.infinity,
+                        margin: const EdgeInsets.only(bottom: 12),
+                        padding: const EdgeInsets.all(16),
+                        decoration: BoxDecoration(
+                          color: Colors.white,
+                          borderRadius: BorderRadius.circular(16),
+                          border: Border.all(color: Colors.grey.shade100),
+                        ),
+                        child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
+                          Row(mainAxisAlignment: MainAxisAlignment.spaceBetween, children: [
+                            Row(children: [
+                              Container(
+                                width: 32, height: 32,
+                                decoration: BoxDecoration(color: Colors.yellow[50], shape: BoxShape.circle),
+                                child: Icon(Icons.person_rounded, color: Colors.yellow[800], size: 18),
+                              ),
+                              const SizedBox(width: 8),
+                              Text(passengerName,
+                                  style: const TextStyle(fontSize: 13, fontWeight: FontWeight.w700, color: Colors.black87)),
+                            ]),
+                            Container(
+                              padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 5),
+                              decoration: BoxDecoration(
+                                color: countdownColor.withOpacity(0.1),
+                                borderRadius: BorderRadius.circular(20),
+                                border: Border.all(color: countdownColor.withOpacity(0.4)),
+                              ),
+                              child: Row(mainAxisSize: MainAxisSize.min, children: [
+                                Icon(Icons.timer_rounded, size: 12, color: countdownColor),
+                                const SizedBox(width: 4),
+                                Text(countdown,
+                                    style: TextStyle(fontSize: 11, fontWeight: FontWeight.w700, color: countdownColor)),
+                              ]),
+                            ),
+                          ]),
+                          const SizedBox(height: 12),
+                          Container(
+                            width: double.infinity,
+                            padding: const EdgeInsets.all(10),
+                            decoration: BoxDecoration(
+                              color: const Color(0xFFEDE7F6),
+                              borderRadius: BorderRadius.circular(10),
+                            ),
+                            child: Row(children: [
+                              const Icon(Icons.calendar_today_rounded, color: Color(0xFF5E35B1), size: 14),
+                              const SizedBox(width: 8),
+                              Expanded(
+                                child: Text(
+                                  '${_formatScheduledDate(dateStr)}  •  ${_formatScheduledTime(timeStr)}',
+                                  style: const TextStyle(color: Color(0xFF4527A0), fontWeight: FontWeight.w700, fontSize: 12),
+                                ),
+                              ),
+                            ]),
+                          ),
+                          const SizedBox(height: 12),
+                          Row(children: [
+                            Container(width: 8, height: 8,
+                                decoration: const BoxDecoration(color: Color(0xFF4CAF50), shape: BoxShape.circle)),
+                            const SizedBox(width: 8),
+                            Expanded(child: Text(pickup,
+                                style: const TextStyle(fontSize: 13, fontWeight: FontWeight.w600, color: Colors.black87),
+                                overflow: TextOverflow.ellipsis)),
+                          ]),
+                          Padding(padding: const EdgeInsets.only(left: 3.5),
+                              child: Container(width: 1, height: 10, color: Colors.grey.shade300)),
+                          Row(children: [
+                            Container(width: 8, height: 8,
+                                decoration: BoxDecoration(color: Colors.yellow[800], shape: BoxShape.circle)),
+                            const SizedBox(width: 8),
+                            Expanded(child: Text(dropoff,
+                                style: const TextStyle(fontSize: 13, fontWeight: FontWeight.w600, color: Colors.black87),
+                                overflow: TextOverflow.ellipsis)),
+                          ]),
+                          const SizedBox(height: 12),
+                          Row(mainAxisAlignment: MainAxisAlignment.end, children: [
+                            Text('Tap to view ride details',
+                                style: TextStyle(fontSize: 11, color: Colors.grey[400])),
+                            const SizedBox(width: 4),
+                            Icon(Icons.chevron_right_rounded, size: 16, color: Colors.grey[400]),
+                          ]),
+                        ]),
+                      ),
+                    );
+                  }),
               ],
             ),
           ),
         ),
-      ),
-    );
-  }
-}
-
-class _SectionLabel extends StatelessWidget {
-  final String title;
-  const _SectionLabel({required this.title});
-
-  @override
-  Widget build(BuildContext context) {
-    return Text(title,
-        style: const TextStyle(fontSize: 15, fontWeight: FontWeight.w700, color: Colors.black87, letterSpacing: 0.1));
-  }
-}
-
-class _ActionCard extends StatelessWidget {
-  final IconData icon;
-  final String label;
-  final Color iconColor;
-  final Color bgColor;
-  final VoidCallback onTap;
-  final int badge;
-
-  const _ActionCard({
-    required this.icon,
-    required this.label,
-    required this.iconColor,
-    required this.bgColor,
-    required this.onTap,
-    this.badge = 0,
-  });
-
-  @override
-  Widget build(BuildContext context) {
-    return InkWell(
-      onTap: onTap,
-      borderRadius: BorderRadius.circular(16),
-      child: Container(
-        padding: const EdgeInsets.symmetric(vertical: 20, horizontal: 8),
-        decoration: BoxDecoration(
-          color: Colors.white,
-          borderRadius: BorderRadius.circular(16),
-          border: Border.all(color: Colors.grey.shade100),
-        ),
-        child: Column(mainAxisSize: MainAxisSize.min, children: [
-          Stack(clipBehavior: Clip.none, children: [
-            Container(
-              width: 48, height: 48,
-              decoration: BoxDecoration(color: bgColor, borderRadius: BorderRadius.circular(14)),
-              child: Icon(icon, color: iconColor, size: 24),
-            ),
-            if (badge > 0)
-              Positioned(top: -5, right: -5,
-                child: Container(
-                  width: 18, height: 18,
-                  decoration: BoxDecoration(
-                      color: Colors.yellow[800], shape: BoxShape.circle,
-                      border: Border.all(color: Colors.white, width: 1.5)),
-                  child: Center(child: Text('$badge',
-                      style: const TextStyle(color: Colors.white, fontSize: 10, fontWeight: FontWeight.w700))),
-                )),
-          ]),
-          const SizedBox(height: 10),
-          Text(label,
-              style: const TextStyle(fontSize: 11, fontWeight: FontWeight.w600, color: Colors.black87),
-              textAlign: TextAlign.center),
-        ]),
       ),
     );
   }

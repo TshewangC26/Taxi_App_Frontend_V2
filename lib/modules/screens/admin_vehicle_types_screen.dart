@@ -237,13 +237,19 @@ class _AdminVehicleTypesScreenState extends State<AdminVehicleTypesScreen>
                   Expanded(child: ElevatedButton(
                     onPressed: () async {
                       if (!isEdit && nameCtrl.text.trim().isEmpty) {
-                        ScaffoldMessenger.of(context).showSnackBar(
-                            SnackBar(content: const Text('Please enter a type name'), backgroundColor: Colors.grey[800]));
+                        await showDialog(
+                          context: context, barrierDismissible: true,
+                          barrierColor: Colors.black.withOpacity(0.5),
+                          builder: (ctx) => _errorDialog(ctx, 'Missing Name', 'Please enter a type name.'),
+                        );
                         return;
                       }
                       if (displayNameCtrl.text.trim().isEmpty) {
-                        ScaffoldMessenger.of(context).showSnackBar(
-                            SnackBar(content: const Text('Please enter a display name'), backgroundColor: Colors.grey[800]));
+                        await showDialog(
+                          context: context, barrierDismissible: true,
+                          barrierColor: Colors.black.withOpacity(0.5),
+                          builder: (ctx) => _errorDialog(ctx, 'Missing Display Name', 'Please enter a display name.'),
+                        );
                         return;
                       }
                       try {
@@ -268,8 +274,11 @@ class _AdminVehicleTypesScreenState extends State<AdminVehicleTypesScreen>
                         }
                       } catch (e) {
                         if (context.mounted) {
-                          ScaffoldMessenger.of(context).showSnackBar(
-                              SnackBar(content: Text('Error: $e'), backgroundColor: Colors.grey[800]));
+                          await showDialog(
+                            context: context, barrierDismissible: true,
+                            barrierColor: Colors.black.withOpacity(0.5),
+                            builder: (ctx) => _errorDialog(ctx, 'Something Went Wrong', 'Could not save vehicle type.\nPlease try again.'),
+                          );
                         }
                       }
                     },
@@ -335,16 +344,55 @@ class _AdminVehicleTypesScreenState extends State<AdminVehicleTypesScreen>
         await _apiService.delete('/admin/vehicle-types/${vehicleType['id']}');
         _loadVehicleTypes();
         if (mounted) {
-          ScaffoldMessenger.of(context).showSnackBar(
-              SnackBar(content: const Text('Vehicle type deleted'), backgroundColor: Colors.grey[800]));
+          ScaffoldMessenger.of(context).showSnackBar(SnackBar(
+            content: const Text('Vehicle type deleted'),
+            backgroundColor: Colors.yellow[800],
+          ));
         }
       } catch (e) {
         if (mounted) {
-          ScaffoldMessenger.of(context).showSnackBar(
-              SnackBar(content: Text('Error: $e'), backgroundColor: Colors.grey[800]));
+          await showDialog(
+            context: context, barrierDismissible: true,
+            barrierColor: Colors.black.withOpacity(0.5),
+            builder: (ctx) => _errorDialog(ctx, 'Delete Failed', 'Could not delete vehicle type.\nPlease try again.'),
+          );
         }
       }
     }
+  }
+
+  // ✅ Reusable error dialog
+  Widget _errorDialog(BuildContext ctx, String title, String message) {
+    return Dialog(
+      backgroundColor: Colors.transparent, elevation: 0,
+      child: Container(
+        padding: const EdgeInsets.all(28),
+        decoration: BoxDecoration(color: Colors.white, borderRadius: BorderRadius.circular(24)),
+        child: Column(mainAxisSize: MainAxisSize.min, children: [
+          Stack(alignment: Alignment.center, children: [
+            Container(width: 80, height: 80, decoration: BoxDecoration(color: Colors.yellow[50], shape: BoxShape.circle)),
+            Container(width: 62, height: 62, decoration: BoxDecoration(color: Colors.yellow[100], shape: BoxShape.circle)),
+            Container(width: 46, height: 46,
+                decoration: BoxDecoration(color: Colors.yellow[800], shape: BoxShape.circle),
+                child: const Icon(Icons.error_outline_rounded, color: Colors.white, size: 22)),
+          ]),
+          const SizedBox(height: 20),
+          Text(title, style: const TextStyle(fontSize: 20, fontWeight: FontWeight.w800, color: Colors.black87)),
+          const SizedBox(height: 8),
+          Text(message, textAlign: TextAlign.center,
+              style: TextStyle(fontSize: 14, color: Colors.grey[500], height: 1.5)),
+          const SizedBox(height: 28),
+          SizedBox(width: double.infinity, height: 50,
+            child: ElevatedButton(
+              onPressed: () => Navigator.of(ctx).pop(),
+              style: ElevatedButton.styleFrom(backgroundColor: Colors.yellow[800], foregroundColor: Colors.white,
+                  elevation: 0, shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(14))),
+              child: const Text('OK', style: TextStyle(fontSize: 15, fontWeight: FontWeight.w600)),
+            ),
+          ),
+        ]),
+      ),
+    );
   }
 
   Widget _dialogField({
@@ -379,18 +427,26 @@ class _AdminVehicleTypesScreenState extends State<AdminVehicleTypesScreen>
       appBar: AppBar(
         backgroundColor: Colors.white, elevation: 0, centerTitle: false,
         titleSpacing: 20, automaticallyImplyLeading: false,
-        title: Row(mainAxisSize: MainAxisSize.min, children: [
-          Image.asset('assets/images/taxi_logo.png', width: 36, height: 36, fit: BoxFit.contain),
-          const SizedBox(width: 10),
-          const Text('Easy Ride', style: TextStyle(color: Colors.black87, fontWeight: FontWeight.w800, fontSize: 19, letterSpacing: 0.3)),
-        ]),
+       title: GestureDetector(
+          onTap: () {
+            Navigator.pushAndRemoveUntil(
+              context,
+              PageRouteBuilder(
+                pageBuilder: (_, animation, __) => FadeTransition(
+                    opacity: animation, child: const AdminHomeScreen()),
+                transitionDuration: const Duration(milliseconds: 300),
+              ),
+              (route) => false,
+            );
+          },
+          child: Row(mainAxisSize: MainAxisSize.min, children: [
+            Image.asset('assets/images/taxi_logo.png', width: 36, height: 36, fit: BoxFit.contain),
+            const SizedBox(width: 10),
+            const Text('Easy Ride', style: TextStyle(color: Colors.black87, fontWeight: FontWeight.w800, fontSize: 19, letterSpacing: 0.3)),
+          ]),
+        ),
         actions: [
-          InkWell(
-            onTap: _loadVehicleTypes,
-            borderRadius: BorderRadius.circular(8),
-            child: Padding(padding: const EdgeInsets.all(8),
-                child: Icon(Icons.refresh_rounded, color: Colors.grey[600], size: 20)),
-          ),
+         
           Padding(
             padding: const EdgeInsets.only(right: 12, left: 4),
             child: InkWell(

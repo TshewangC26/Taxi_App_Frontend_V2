@@ -353,14 +353,24 @@ class _AdminPassengersScreenState
                             (!isEdit &&
                                 (emailCtrl.text.trim().isEmpty ||
                                     passwordCtrl.text.isEmpty))) {
-                          ScaffoldMessenger.of(context)
-                              .showSnackBar(SnackBar(
-                            content: const Text(
-                                'Please fill all fields'),
-                            backgroundColor: Colors.grey[800],
-                          ));
+                          await showDialog(
+                            context: context, barrierDismissible: true,
+                            barrierColor: Colors.black.withOpacity(0.5),
+                            builder: (ctx) => _errorDialog(ctx, 'Missing Fields', 'Please fill in all required fields.'),
+                          );
                           return;
                         }
+
+                        // ✅ Password minimum 12 characters
+                        if (!isEdit && passwordCtrl.text.length < 12) {
+                          await showDialog(
+                            context: context, barrierDismissible: true,
+                            barrierColor: Colors.black.withOpacity(0.5),
+                            builder: (ctx) => _errorDialog(ctx, 'Password Too Short', 'Password must be at least 12 characters long.'),
+                          );
+                          return;
+                        }
+
                         try {
                           if (isEdit) {
                             await _apiService.put(
@@ -370,8 +380,7 @@ class _AdminPassengersScreenState
                                   'phone': phoneCtrl.text.trim(),
                                 });
                           } else {
-                            await _apiService
-                                .post('/admin/passengers', {
+                            await _apiService.post('/admin/passengers', {
                               'name': nameCtrl.text.trim(),
                               'email': emailCtrl.text.trim(),
                               'password': passwordCtrl.text,
@@ -381,21 +390,77 @@ class _AdminPassengersScreenState
                           if (ctx.mounted) Navigator.pop(ctx);
                           _loadPassengers();
                           if (context.mounted) {
-                            ScaffoldMessenger.of(context)
-                                .showSnackBar(SnackBar(
-                              content: Text(isEdit
-                                  ? 'Passenger updated!'
-                                  : 'Passenger added!'),
+                            ScaffoldMessenger.of(context).showSnackBar(SnackBar(
+                              content: Text(isEdit ? 'Passenger updated!' : 'Passenger added!'),
                               backgroundColor: Colors.yellow[800],
                             ));
                           }
                         } catch (e) {
                           if (context.mounted) {
-                            ScaffoldMessenger.of(context)
-                                .showSnackBar(SnackBar(
-                              content: Text('Error: $e'),
-                              backgroundColor: Colors.grey[800],
-                            ));
+                            // ✅ Check if email already taken
+                            final errorMsg = e.toString();
+                            final isEmailTaken = errorMsg.toLowerCase().contains('email') &&
+                                errorMsg.toLowerCase().contains('taken');
+
+                            if (isEmailTaken) {
+                              await showDialog(
+                                context: context,
+                                barrierDismissible: true,
+                                barrierColor: Colors.black.withOpacity(0.5),
+                                builder: (ctx) => Dialog(
+                                  backgroundColor: Colors.transparent,
+                                  elevation: 0,
+                                  child: Container(
+                                    padding: const EdgeInsets.all(28),
+                                    decoration: BoxDecoration(
+                                        color: Colors.white,
+                                        borderRadius: BorderRadius.circular(24)),
+                                    child: Column(mainAxisSize: MainAxisSize.min, children: [
+                                      Stack(alignment: Alignment.center, children: [
+                                        Container(width: 80, height: 80,
+                                            decoration: BoxDecoration(color: Colors.yellow[50], shape: BoxShape.circle)),
+                                        Container(width: 62, height: 62,
+                                            decoration: BoxDecoration(color: Colors.yellow[100], shape: BoxShape.circle)),
+                                        Container(width: 46, height: 46,
+                                            decoration: BoxDecoration(color: Colors.yellow[800], shape: BoxShape.circle),
+                                            child: const Icon(Icons.email_rounded, color: Colors.white, size: 22)),
+                                      ]),
+                                      const SizedBox(height: 20),
+                                      const Text('Email Already Used',
+                                          style: TextStyle(fontSize: 20, fontWeight: FontWeight.w800, color: Colors.black87)),
+                                      const SizedBox(height: 8),
+                                      Text(
+                                        'The email "${emailCtrl.text.trim()}" is already registered.\n\nPlease use a different email address.',
+                                        textAlign: TextAlign.center,
+                                        style: TextStyle(fontSize: 14, color: Colors.grey[500], height: 1.5),
+                                      ),
+                                      const SizedBox(height: 28),
+                                      SizedBox(
+                                        width: double.infinity,
+                                        height: 50,
+                                        child: ElevatedButton(
+                                          onPressed: () => Navigator.of(ctx).pop(),
+                                          style: ElevatedButton.styleFrom(
+                                            backgroundColor: Colors.yellow[800],
+                                            foregroundColor: Colors.white,
+                                            elevation: 0,
+                                            shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(14)),
+                                          ),
+                                          child: const Text('Try Again',
+                                              style: TextStyle(fontSize: 15, fontWeight: FontWeight.w600)),
+                                        ),
+                                      ),
+                                    ]),
+                                  ),
+                                ),
+                              );
+                            } else {
+                              await showDialog(
+                                context: context, barrierDismissible: true,
+                                barrierColor: Colors.black.withOpacity(0.5),
+                                builder: (ctx) => _errorDialog(ctx, 'Something Went Wrong', 'Could not complete the request.\nPlease try again.'),
+                              );
+                            }
                           }
                         }
                       },
@@ -510,24 +575,58 @@ class _AdminPassengersScreenState
 
     if (confirmed == true) {
       try {
-        await _apiService
-            .delete('/admin/passengers/${passenger['id']}');
+        await _apiService.delete('/admin/passengers/${passenger['id']}');
         _loadPassengers();
         if (mounted) {
           ScaffoldMessenger.of(context).showSnackBar(SnackBar(
             content: const Text('Passenger deleted'),
-            backgroundColor: Colors.grey[800],
+            backgroundColor: Colors.yellow[800],
           ));
         }
       } catch (e) {
         if (mounted) {
-          ScaffoldMessenger.of(context).showSnackBar(SnackBar(
-            content: Text('Error: $e'),
-            backgroundColor: Colors.grey[800],
-          ));
+          await showDialog(
+            context: context, barrierDismissible: true,
+            barrierColor: Colors.black.withOpacity(0.5),
+            builder: (ctx) => _errorDialog(ctx, 'Delete Failed', 'Could not delete passenger.\nPlease try again.'),
+          );
         }
       }
     }
+  }
+
+ // ✅ Reusable error dialog
+  Widget _errorDialog(BuildContext ctx, String title, String message) {
+    return Dialog(
+      backgroundColor: Colors.transparent, elevation: 0,
+      child: Container(
+        padding: const EdgeInsets.all(28),
+        decoration: BoxDecoration(color: Colors.white, borderRadius: BorderRadius.circular(24)),
+        child: Column(mainAxisSize: MainAxisSize.min, children: [
+          Stack(alignment: Alignment.center, children: [
+            Container(width: 80, height: 80, decoration: BoxDecoration(color: Colors.yellow[50], shape: BoxShape.circle)),
+            Container(width: 62, height: 62, decoration: BoxDecoration(color: Colors.yellow[100], shape: BoxShape.circle)),
+            Container(width: 46, height: 46,
+                decoration: BoxDecoration(color: Colors.yellow[800], shape: BoxShape.circle),
+                child: const Icon(Icons.error_outline_rounded, color: Colors.white, size: 22)),
+          ]),
+          const SizedBox(height: 20),
+          Text(title, style: const TextStyle(fontSize: 20, fontWeight: FontWeight.w800, color: Colors.black87)),
+          const SizedBox(height: 8),
+          Text(message, textAlign: TextAlign.center,
+              style: TextStyle(fontSize: 14, color: Colors.grey[500], height: 1.5)),
+          const SizedBox(height: 28),
+          SizedBox(width: double.infinity, height: 50,
+            child: ElevatedButton(
+              onPressed: () => Navigator.of(ctx).pop(),
+              style: ElevatedButton.styleFrom(backgroundColor: Colors.yellow[800], foregroundColor: Colors.white,
+                  elevation: 0, shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(14))),
+              child: const Text('OK', style: TextStyle(fontSize: 15, fontWeight: FontWeight.w600)),
+            ),
+          ),
+        ]),
+      ),
+    );
   }
 
   // ── Dialog field helper ───────────────────────────────────────
@@ -594,31 +693,35 @@ class _AdminPassengersScreenState
         centerTitle: false,
         titleSpacing: 20,
         automaticallyImplyLeading: false,
-        title: Row(
-          mainAxisSize: MainAxisSize.min,
-          children: [
-            Image.asset('assets/images/taxi_logo.png',
-                width: 36, height: 36, fit: BoxFit.contain),
-            const SizedBox(width: 10),
-            const Text('Easy Ride',
-                style: TextStyle(
-                    color: Colors.black87,
-                    fontWeight: FontWeight.w800,
-                    fontSize: 19,
-                    letterSpacing: 0.3)),
-          ],
+       title: GestureDetector(
+          onTap: () {
+            Navigator.pushAndRemoveUntil(
+              context,
+              PageRouteBuilder(
+                pageBuilder: (_, animation, __) => FadeTransition(
+                    opacity: animation, child: const AdminHomeScreen()),
+                transitionDuration: const Duration(milliseconds: 300),
+              ),
+              (route) => false,
+            );
+          },
+          child: Row(
+            mainAxisSize: MainAxisSize.min,
+            children: [
+              Image.asset('assets/images/taxi_logo.png',
+                  width: 36, height: 36, fit: BoxFit.contain),
+              const SizedBox(width: 10),
+              const Text('Easy Ride',
+                  style: TextStyle(
+                      color: Colors.black87,
+                      fontWeight: FontWeight.w800,
+                      fontSize: 19,
+                      letterSpacing: 0.3)),
+            ],
+          ),
         ),
         actions: [
-          InkWell(
-            onTap: _loadPassengers,
-            borderRadius: BorderRadius.circular(8),
-            child: Padding(
-              padding: const EdgeInsets.all(8),
-              child: Icon(Icons.refresh_rounded,
-                  color: Colors.grey[600], size: 20),
-            ),
-          ),
-          Padding(
+         Padding(
             padding: const EdgeInsets.only(right: 12, left: 4),
             child: InkWell(
               onTap: _confirmLogout,

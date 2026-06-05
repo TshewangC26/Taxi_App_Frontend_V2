@@ -78,6 +78,21 @@ class _DriverMyRidesScreenState extends State<DriverMyRidesScreen>
     }
   }
 
+  Future<void> _whatsappPassenger(String phone) async {
+    String cleaned = phone.replaceAll(RegExp(r'[^0-9]'), '');
+    if (!cleaned.startsWith('975')) {
+      cleaned = '975$cleaned';
+    }
+    final uri = Uri.parse('https://wa.me/$cleaned');
+    if (await canLaunchUrl(uri)) {
+      await launchUrl(uri, mode: LaunchMode.externalApplication);
+    } else if (mounted) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(content: const Text('WhatsApp is not installed'), backgroundColor: Colors.grey[800]),
+      );
+    }
+  }
+
   List<dynamic> _sortedRides(List<dynamic> rides) {
     final scheduled = rides.where((r) => r['booking_type'] == 'scheduled').toList();
     final active = scheduled.where((r) => r['status'] == 'accepted' || r['status'] == 'in_progress').toList();
@@ -115,7 +130,6 @@ class _DriverMyRidesScreenState extends State<DriverMyRidesScreen>
     }
   }
 
-  // ✅ Hamburger menu
   void _openMenu() {
     showModalBottomSheet(
       context: context,
@@ -746,22 +760,26 @@ class _DriverMyRidesScreenState extends State<DriverMyRidesScreen>
         centerTitle: false,
         titleSpacing: 20,
         automaticallyImplyLeading: false,
-        title: Row(mainAxisSize: MainAxisSize.min, children: [
-          Image.asset('assets/images/taxi_logo.png', width: 36, height: 36, fit: BoxFit.contain),
-          const SizedBox(width: 10),
-          const Text('Easy Ride',
-              style: TextStyle(color: Colors.black87, fontWeight: FontWeight.w800, fontSize: 19, letterSpacing: 0.3)),
-        ]),
+        title: GestureDetector(
+          onTap: () {
+            Navigator.pushAndRemoveUntil(
+              context,
+              PageRouteBuilder(
+                pageBuilder: (_, animation, __) => FadeTransition(
+                    opacity: animation, child: const DriverHomeScreen()),
+                transitionDuration: const Duration(milliseconds: 300),
+              ),
+              (route) => false,
+            );
+          },
+          child: Row(mainAxisSize: MainAxisSize.min, children: [
+            Image.asset('assets/images/taxi_logo.png', width: 36, height: 36, fit: BoxFit.contain),
+            const SizedBox(width: 10),
+            const Text('Easy Ride',
+                style: TextStyle(color: Colors.black87, fontWeight: FontWeight.w800, fontSize: 19, letterSpacing: 0.3)),
+          ]),
+        ),
         actions: [
-          InkWell(
-            onTap: _refreshRides,
-            borderRadius: BorderRadius.circular(8),
-            child: Padding(
-              padding: const EdgeInsets.all(8),
-              child: Icon(Icons.refresh_rounded, color: Colors.grey[600], size: 20),
-            ),
-          ),
-          // ✅ Hamburger menu
           Padding(
             padding: const EdgeInsets.only(right: 12, left: 4),
             child: InkWell(
@@ -929,6 +947,7 @@ class _DriverMyRidesScreenState extends State<DriverMyRidesScreen>
               ]),
             ),
 
+          // ── Passenger info with call + WhatsApp ──
           Container(
             width: double.infinity,
             padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 12),
@@ -948,12 +967,23 @@ class _DriverMyRidesScreenState extends State<DriverMyRidesScreen>
                   Text('No phone available', style: TextStyle(fontSize: 12, color: Colors.grey[400])),
               ])),
               if (passengerPhone.isNotEmpty)
-                GestureDetector(
-                  onTap: () => _callPassenger(passengerPhone),
-                  child: Container(width: 38, height: 38,
-                      decoration: BoxDecoration(color: const Color(0xFF2E7D32).withOpacity(0.1), shape: BoxShape.circle),
-                      child: const Icon(Icons.call_rounded, color: Color(0xFF2E7D32), size: 18)),
-                ),
+                Row(mainAxisSize: MainAxisSize.min, children: [
+                  // ✅ Call button
+                  GestureDetector(
+                    onTap: () => _callPassenger(passengerPhone),
+                    child: Container(width: 38, height: 38,
+                        decoration: BoxDecoration(color: const Color(0xFF2E7D32).withOpacity(0.1), shape: BoxShape.circle),
+                        child: const Icon(Icons.call_rounded, color: Color(0xFF2E7D32), size: 18)),
+                  ),
+                  const SizedBox(width: 8),
+                  // ✅ WhatsApp button
+                  GestureDetector(
+                    onTap: () => _whatsappPassenger(passengerPhone),
+                    child: Container(width: 38, height: 38,
+                        decoration: BoxDecoration(color: const Color(0xFF25D366).withOpacity(0.1), shape: BoxShape.circle),
+                        child: const Icon(Icons.chat_rounded, color: Color(0xFF25D366), size: 18)),
+                  ),
+                ]),
             ]),
           ),
 

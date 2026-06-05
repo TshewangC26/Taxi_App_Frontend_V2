@@ -314,21 +314,23 @@ class _AdminRoutesScreenState extends State<AdminRoutesScreen>
                     Expanded(child: ElevatedButton(
                       onPressed: () async {
                         if (pickupCtrl.text.trim().isEmpty || dropoffCtrl.text.trim().isEmpty) {
-                          ScaffoldMessenger.of(context).showSnackBar(SnackBar(
-                            content: const Text('Please enter both locations'),
-                            backgroundColor: Colors.grey[800],
-                          ));
+                          await showDialog(
+                            context: context, barrierDismissible: true,
+                            barrierColor: Colors.black.withOpacity(0.5),
+                            builder: (ctx) => _errorDialog(ctx, 'Missing Locations', 'Please enter both pickup and dropoff locations.'),
+                          );
                           return;
                         }
                         if (pickupCtrl.text.trim() == dropoffCtrl.text.trim()) {
-                          ScaffoldMessenger.of(context).showSnackBar(SnackBar(
-                            content: const Text('Pickup and dropoff cannot be the same'),
-                            backgroundColor: Colors.grey[800],
-                          ));
+                          await showDialog(
+                            context: context, barrierDismissible: true,
+                            barrierColor: Colors.black.withOpacity(0.5),
+                            builder: (ctx) => _errorDialog(ctx, 'Same Location', 'Pickup and dropoff locations cannot be the same.'),
+                          );
                           return;
                         }
 
-                        // ✅ Build dynamic prices array
+                       // ✅ Build dynamic prices array
                         final List<Map<String, dynamic>> prices = [];
                         for (final vt in _vehicleTypes) {
                           final name = vt['name'].toString();
@@ -339,7 +341,49 @@ class _AdminRoutesScreenState extends State<AdminRoutesScreen>
                           });
                         }
 
-                        try {
+                        // ✅ Price validation — sort by seater count, validate ascending order
+                        final sortedVehicleTypes = List<dynamic>.from(_vehicleTypes)
+                          ..sort((a, b) {
+                            final aSeats = int.tryParse(a['seater_count']?.toString() ?? '0') ?? 0;
+                            final bSeats = int.tryParse(b['seater_count']?.toString() ?? '0') ?? 0;
+                            return aSeats.compareTo(bSeats);
+                          });
+
+                        String? validationError;
+                        double? prevPrice;
+                        String? prevName;
+
+                        for (final vt in sortedVehicleTypes) {
+                          final name = vt['name'].toString();
+                          final displayName = vt['display_name'].toString();
+                          final priceText = priceControllers[name]?.text ?? '';
+                          final price = double.tryParse(priceText);
+
+                          if (price == null || price <= 0) {
+                            validationError = 'Please enter a valid price for $displayName';
+                            break;
+                          }
+
+                          if (prevPrice != null && price <= prevPrice) {
+                            validationError =
+                                '$displayName price (Nu. ${price.toStringAsFixed(0)}) must be greater than $prevName price (Nu. ${prevPrice.toStringAsFixed(0)}).\n\nPrices must be in ascending order by vehicle size.';
+                            break;
+                          }
+
+                          prevPrice = price;
+                          prevName  = displayName;
+                        }
+
+                        if (validationError != null) {
+                          await showDialog(
+                            context: context, barrierDismissible: true,
+                            barrierColor: Colors.black.withOpacity(0.5),
+                            builder: (ctx) => _errorDialog(ctx, 'Invalid Price', validationError!),
+                          );
+                          return;
+                        }
+
+                       try {
                           final data = {
                             'pickup_location':  pickupCtrl.text.trim(),
                             'dropoff_location': dropoffCtrl.text.trim(),
@@ -361,10 +405,71 @@ class _AdminRoutesScreenState extends State<AdminRoutesScreen>
                           }
                         } catch (e) {
                           if (context.mounted) {
-                            ScaffoldMessenger.of(context).showSnackBar(SnackBar(
-                              content: Text('Error: $e'),
-                              backgroundColor: Colors.grey[800],
-                            ));
+                            // ✅ Check if route already exists
+                            final errorMsg = e.toString().toLowerCase();
+                            final isRouteExists = errorMsg.contains('already') ||
+                                errorMsg.contains('exists') ||
+                                errorMsg.contains('duplicate') ||
+                                errorMsg.contains('unique');
+
+                            if (isRouteExists) {
+                              await showDialog(
+                                context: context,
+                                barrierDismissible: true,
+                                barrierColor: Colors.black.withOpacity(0.5),
+                                builder: (ctx) => Dialog(
+                                  backgroundColor: Colors.transparent,
+                                  elevation: 0,
+                                  child: Container(
+                                    padding: const EdgeInsets.all(28),
+                                    decoration: BoxDecoration(
+                                        color: Colors.white,
+                                        borderRadius: BorderRadius.circular(24)),
+                                    child: Column(mainAxisSize: MainAxisSize.min, children: [
+                                      Stack(alignment: Alignment.center, children: [
+                                        Container(width: 80, height: 80,
+                                            decoration: BoxDecoration(color: Colors.yellow[50], shape: BoxShape.circle)),
+                                        Container(width: 62, height: 62,
+                                            decoration: BoxDecoration(color: Colors.yellow[100], shape: BoxShape.circle)),
+                                        Container(width: 46, height: 46,
+                                            decoration: BoxDecoration(color: Colors.yellow[800], shape: BoxShape.circle),
+                                            child: const Icon(Icons.route_rounded, color: Colors.white, size: 22)),
+                                      ]),
+                                      const SizedBox(height: 20),
+                                      const Text('Route Already Exists',
+                                          style: TextStyle(fontSize: 20, fontWeight: FontWeight.w800, color: Colors.black87)),
+                                      const SizedBox(height: 8),
+                                      Text(
+                                        'A route from\n"${pickupCtrl.text.trim()}" → "${dropoffCtrl.text.trim()}"\nalready exists.\n\nPlease use different locations.',
+                                        textAlign: TextAlign.center,
+                                        style: TextStyle(fontSize: 14, color: Colors.grey[500], height: 1.5),
+                                      ),
+                                      const SizedBox(height: 28),
+                                      SizedBox(
+                                        width: double.infinity, height: 50,
+                                        child: ElevatedButton(
+                                          onPressed: () => Navigator.of(ctx).pop(),
+                                          style: ElevatedButton.styleFrom(
+                                            backgroundColor: Colors.yellow[800],
+                                            foregroundColor: Colors.white,
+                                            elevation: 0,
+                                            shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(14)),
+                                          ),
+                                          child: const Text('Try Again',
+                                              style: TextStyle(fontSize: 15, fontWeight: FontWeight.w600)),
+                                        ),
+                                      ),
+                                    ]),
+                                  ),
+                                ),
+                              );
+                           } else {
+                              await showDialog(
+                                context: context, barrierDismissible: true,
+                                barrierColor: Colors.black.withOpacity(0.5),
+                                builder: (ctx) => _errorDialog(ctx, 'Something Went Wrong', 'Could not save the route.\nPlease try again.'),
+                              );
+                            }
                           }
                         }
                       },
@@ -446,18 +551,53 @@ class _AdminRoutesScreenState extends State<AdminRoutesScreen>
         if (mounted) {
           ScaffoldMessenger.of(context).showSnackBar(SnackBar(
             content: const Text('Route deleted'),
-            backgroundColor: Colors.grey[800],
+            backgroundColor: Colors.yellow[800],
           ));
         }
       } catch (e) {
         if (mounted) {
-          ScaffoldMessenger.of(context).showSnackBar(SnackBar(
-            content: Text('Error: $e'),
-            backgroundColor: Colors.grey[800],
-          ));
+          await showDialog(
+            context: context, barrierDismissible: true,
+            barrierColor: Colors.black.withOpacity(0.5),
+            builder: (ctx) => _errorDialog(ctx, 'Delete Failed', 'Could not delete route.\nPlease try again.'),
+          );
         }
       }
     }
+  }
+
+  // ✅ Reusable error dialog
+  Widget _errorDialog(BuildContext ctx, String title, String message) {
+    return Dialog(
+      backgroundColor: Colors.transparent, elevation: 0,
+      child: Container(
+        padding: const EdgeInsets.all(28),
+        decoration: BoxDecoration(color: Colors.white, borderRadius: BorderRadius.circular(24)),
+        child: Column(mainAxisSize: MainAxisSize.min, children: [
+          Stack(alignment: Alignment.center, children: [
+            Container(width: 80, height: 80, decoration: BoxDecoration(color: Colors.yellow[50], shape: BoxShape.circle)),
+            Container(width: 62, height: 62, decoration: BoxDecoration(color: Colors.yellow[100], shape: BoxShape.circle)),
+            Container(width: 46, height: 46,
+                decoration: BoxDecoration(color: Colors.yellow[800], shape: BoxShape.circle),
+                child: const Icon(Icons.error_outline_rounded, color: Colors.white, size: 22)),
+          ]),
+          const SizedBox(height: 20),
+          Text(title, style: const TextStyle(fontSize: 20, fontWeight: FontWeight.w800, color: Colors.black87)),
+          const SizedBox(height: 8),
+          Text(message, textAlign: TextAlign.center,
+              style: TextStyle(fontSize: 14, color: Colors.grey[500], height: 1.5)),
+          const SizedBox(height: 28),
+          SizedBox(width: double.infinity, height: 50,
+            child: ElevatedButton(
+              onPressed: () => Navigator.of(ctx).pop(),
+              style: ElevatedButton.styleFrom(backgroundColor: Colors.yellow[800], foregroundColor: Colors.white,
+                  elevation: 0, shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(14))),
+              child: const Text('OK', style: TextStyle(fontSize: 15, fontWeight: FontWeight.w600)),
+            ),
+          ),
+        ]),
+      ),
+    );
   }
 
   // ── Dialog field helper ───────────────────────────────────────
@@ -499,19 +639,27 @@ class _AdminRoutesScreenState extends State<AdminRoutesScreen>
       appBar: AppBar(
         backgroundColor: Colors.white, elevation: 0,
         centerTitle: false, titleSpacing: 20, automaticallyImplyLeading: false,
-        title: Row(mainAxisSize: MainAxisSize.min, children: [
-          Image.asset('assets/images/taxi_logo.png', width: 36, height: 36, fit: BoxFit.contain),
-          const SizedBox(width: 10),
-          const Text('Easy Ride',
-              style: TextStyle(color: Colors.black87, fontWeight: FontWeight.w800,
-                  fontSize: 19, letterSpacing: 0.3)),
-        ]),
-        actions: [
-          InkWell(
-            onTap: _loadRoutes, borderRadius: BorderRadius.circular(8),
-            child: Padding(padding: const EdgeInsets.all(8),
-                child: Icon(Icons.refresh_rounded, color: Colors.grey[600], size: 20)),
-          ),
+       title: GestureDetector(
+          onTap: () {
+            Navigator.pushAndRemoveUntil(
+              context,
+              PageRouteBuilder(
+                pageBuilder: (_, animation, __) => FadeTransition(
+                    opacity: animation, child: const AdminHomeScreen()),
+                transitionDuration: const Duration(milliseconds: 300),
+              ),
+              (route) => false,
+            );
+          },
+          child: Row(mainAxisSize: MainAxisSize.min, children: [
+            Image.asset('assets/images/taxi_logo.png', width: 36, height: 36, fit: BoxFit.contain),
+            const SizedBox(width: 10),
+            const Text('Easy Ride',
+                style: TextStyle(color: Colors.black87, fontWeight: FontWeight.w800,
+                    fontSize: 19, letterSpacing: 0.3)),
+          ]),
+        ),
+       actions: [
           Padding(
             padding: const EdgeInsets.only(right: 12, left: 4),
             child: InkWell(

@@ -1,10 +1,31 @@
 import 'dart:io';
 import 'package:flutter/foundation.dart';
 import 'package:flutter/material.dart';
+import 'package:flutter/services.dart';
 import 'package:provider/provider.dart';
 import 'package:image_picker/image_picker.dart';
 import '../providers/auth_provider.dart';
 import '../providers/driver_provider.dart';
+
+// ✅ Bhutan phone formatter
+class BhutanPhoneFormatter extends TextInputFormatter {
+  @override
+  TextEditingValue formatEditUpdate(
+      TextEditingValue oldValue, TextEditingValue newValue) {
+    if (newValue.text.isEmpty) {
+      return const TextEditingValue(text: '', selection: TextSelection.collapsed(offset: 0));
+    }
+    String raw = newValue.text.replaceAll(RegExp(r'[^0-9]'), '');
+    if (raw.startsWith('975')) raw = raw.substring(3);
+    if (raw.isEmpty) return const TextEditingValue(text: '', selection: TextSelection.collapsed(offset: 0));
+    if (raw.length > 8) raw = raw.substring(0, 8);
+    String formatted = '+975';
+    if (raw.length >= 1) formatted += ' ${raw.substring(0, raw.length >= 2 ? 2 : raw.length)}';
+    if (raw.length >= 3) formatted += ' ${raw.substring(2, raw.length >= 5 ? 5 : raw.length)}';
+    if (raw.length >= 6) formatted += ' ${raw.substring(5, raw.length >= 8 ? 8 : raw.length)}';
+    return TextEditingValue(text: formatted, selection: TextSelection.collapsed(offset: formatted.length));
+  }
+}
 
 class DriverEditProfileScreen extends StatefulWidget {
   const DriverEditProfileScreen({super.key});
@@ -189,9 +210,19 @@ class _DriverEditProfileScreenState extends State<DriverEditProfileScreen>
                         TextFormField(
                           controller: _phoneController,
                           keyboardType: TextInputType.phone,
+                          inputFormatters: [BhutanPhoneFormatter()],
                           style: const TextStyle(color: Colors.black87, fontSize: 15),
-                          decoration: _fieldDec('Phone Number', Icons.phone_outlined),
-                          validator: (v) => (v == null || v.isEmpty) ? 'Please enter your phone number' : null,
+                          decoration: _fieldDec('Phone Number', Icons.phone_outlined, helper: 'e.g. +975 17 123 456'),
+                          validator: (v) {
+                            if (v == null || v.isEmpty) return 'Please enter your phone number';
+                            final digits = v.replaceAll(RegExp(r'[^0-9]'), '');
+                            final local = digits.startsWith('975') ? digits.substring(3) : digits;
+                            if (local.length != 8) return 'Enter a valid Bhutan number e.g. +975 17 123 456';
+                            if (!local.startsWith('16') && !local.startsWith('17') && !local.startsWith('77')) {
+                              return 'Number must start with 16, 17, or 77';
+                            }
+                            return null;
+                          },
                         ),
                         const SizedBox(height: 12),
                         TextFormField(

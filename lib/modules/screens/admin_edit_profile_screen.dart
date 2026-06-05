@@ -8,6 +8,8 @@ import 'admin_home_screen.dart';
 import 'admin_routes_screen.dart';
 import 'admin_drivers_screen.dart';
 import 'admin_passengers_screen.dart';
+import 'change_password_screen.dart';
+import 'login_screens.dart';
 
 class AdminEditProfileScreen extends StatefulWidget {
   const AdminEditProfileScreen({super.key});
@@ -109,14 +111,109 @@ class _AdminEditProfileScreenState extends State<AdminEditProfileScreen>
     if (!mounted) return;
 
     if (success) {
-      // ✅ Clear image cache so new photo shows immediately
       PaintingBinding.instance.imageCache.clear();
       ScaffoldMessenger.of(context).showSnackBar(
         SnackBar(content: const Text('Profile updated successfully!'), backgroundColor: Colors.yellow[800]));
       Navigator.pop(context);
     } else {
-      ScaffoldMessenger.of(context).showSnackBar(
-        SnackBar(content: Text(authProvider.errorMessage ?? 'Failed to update profile'), backgroundColor: Colors.grey[800]));
+      await showDialog(
+        context: context,
+        barrierDismissible: true,
+        barrierColor: Colors.black.withOpacity(0.5),
+        builder: (ctx) => Dialog(
+          backgroundColor: Colors.transparent,
+          elevation: 0,
+          child: Container(
+            padding: const EdgeInsets.all(28),
+            decoration: BoxDecoration(color: Colors.white, borderRadius: BorderRadius.circular(24)),
+            child: Column(mainAxisSize: MainAxisSize.min, children: [
+              Stack(alignment: Alignment.center, children: [
+                Container(width: 80, height: 80, decoration: BoxDecoration(color: Colors.yellow[50], shape: BoxShape.circle)),
+                Container(width: 62, height: 62, decoration: BoxDecoration(color: Colors.yellow[100], shape: BoxShape.circle)),
+                Container(width: 46, height: 46,
+                    decoration: BoxDecoration(color: Colors.yellow[800], shape: BoxShape.circle),
+                    child: const Icon(Icons.error_outline_rounded, color: Colors.white, size: 22)),
+              ]),
+              const SizedBox(height: 20),
+              const Text('Update Failed',
+                  style: TextStyle(fontSize: 20, fontWeight: FontWeight.w800, color: Colors.black87)),
+              const SizedBox(height: 8),
+              Text(
+                authProvider.errorMessage ?? 'Failed to update profile.\nPlease try again.',
+                textAlign: TextAlign.center,
+                style: TextStyle(fontSize: 14, color: Colors.grey[500], height: 1.5),
+              ),
+              const SizedBox(height: 28),
+              SizedBox(
+                width: double.infinity, height: 50,
+                child: ElevatedButton(
+                  onPressed: () => Navigator.of(ctx).pop(),
+                  style: ElevatedButton.styleFrom(
+                    backgroundColor: Colors.yellow[800], foregroundColor: Colors.white,
+                    elevation: 0, shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(14)),
+                  ),
+                  child: const Text('Try Again', style: TextStyle(fontSize: 15, fontWeight: FontWeight.w600)),
+                ),
+              ),
+            ]),
+          ),
+        ),
+      );
+    }
+  }
+
+  Future<void> _confirmLogout() async {
+    final confirmed = await showDialog<bool>(
+      context: context,
+      barrierDismissible: true,
+      barrierColor: Colors.black.withOpacity(0.5),
+      builder: (ctx) => Dialog(
+        backgroundColor: Colors.transparent, elevation: 0,
+        child: Container(
+          padding: const EdgeInsets.all(28),
+          decoration: BoxDecoration(color: Colors.white, borderRadius: BorderRadius.circular(24)),
+          child: Column(mainAxisSize: MainAxisSize.min, children: [
+            Stack(alignment: Alignment.center, children: [
+              Container(width: 80, height: 80, decoration: BoxDecoration(color: Colors.yellow[50], shape: BoxShape.circle)),
+              Container(width: 62, height: 62, decoration: BoxDecoration(color: Colors.yellow[100], shape: BoxShape.circle)),
+              Container(width: 46, height: 46, decoration: BoxDecoration(color: Colors.yellow[800], shape: BoxShape.circle),
+                  child: const Icon(Icons.logout_rounded, color: Colors.white, size: 22)),
+            ]),
+            const SizedBox(height: 20),
+            const Text('Logging Out?', style: TextStyle(fontSize: 20, fontWeight: FontWeight.w800, color: Colors.black87)),
+            const SizedBox(height: 8),
+            Text('Would you like to logout from\nEasy Ride?', textAlign: TextAlign.center,
+                style: TextStyle(fontSize: 14, color: Colors.grey[500], height: 1.5)),
+            const SizedBox(height: 28),
+            Row(children: [
+              Expanded(child: OutlinedButton(
+                onPressed: () => Navigator.of(ctx).pop(false),
+                style: OutlinedButton.styleFrom(padding: const EdgeInsets.symmetric(vertical: 14),
+                    side: BorderSide(color: Colors.grey.shade300),
+                    shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(14)), foregroundColor: Colors.black54),
+                child: const Text('Cancel', style: TextStyle(fontSize: 15, fontWeight: FontWeight.w600)),
+              )),
+              const SizedBox(width: 12),
+              Expanded(child: ElevatedButton(
+                onPressed: () => Navigator.of(ctx).pop(true),
+                style: ElevatedButton.styleFrom(backgroundColor: Colors.yellow[800], foregroundColor: Colors.white,
+                    elevation: 0, padding: const EdgeInsets.symmetric(vertical: 14),
+                    shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(14))),
+                child: const Text('Yes, Logout', style: TextStyle(fontSize: 15, fontWeight: FontWeight.w600)),
+              )),
+            ]),
+          ]),
+        ),
+      ),
+    );
+    if (confirmed == true && mounted) {
+      final authProvider = Provider.of<AuthProvider>(context, listen: false);
+      await authProvider.logout();
+      if (mounted) {
+        Navigator.of(context).pushAndRemoveUntil(
+          PageRouteBuilder(pageBuilder: (_, animation, __) => FadeTransition(opacity: animation, child: const LoginScreen()),
+              transitionDuration: const Duration(milliseconds: 500)), (route) => false);
+      }
     }
   }
 
@@ -161,13 +258,27 @@ class _AdminEditProfileScreenState extends State<AdminEditProfileScreen>
     return Scaffold(
       backgroundColor: const Color(0xFFF4F4F6),
       appBar: AppBar(
-        backgroundColor: Colors.white, elevation: 0, centerTitle: true,
-        leading: IconButton(
-          icon: Container(padding: const EdgeInsets.all(6), decoration: BoxDecoration(color: Colors.grey[100], borderRadius: BorderRadius.circular(10), border: Border.all(color: Colors.grey.shade200)),
-              child: Icon(Icons.arrow_back_ios_new, color: Colors.grey[700], size: 16)),
-          onPressed: () => Navigator.pop(context),
+        backgroundColor: Colors.white, elevation: 0, centerTitle: false,
+        titleSpacing: 20, automaticallyImplyLeading: false,
+        title: GestureDetector(
+          onTap: () {
+            Navigator.pushAndRemoveUntil(
+              context,
+              PageRouteBuilder(
+                pageBuilder: (_, animation, __) => FadeTransition(
+                    opacity: animation, child: const AdminHomeScreen()),
+                transitionDuration: const Duration(milliseconds: 300),
+              ),
+              (route) => false,
+            );
+          },
+          child: Row(mainAxisSize: MainAxisSize.min, children: [
+            Image.asset('assets/images/taxi_logo.png', width: 36, height: 36, fit: BoxFit.contain),
+            const SizedBox(width: 10),
+            const Text('Easy Ride', style: TextStyle(color: Colors.black87, fontWeight: FontWeight.w800, fontSize: 19, letterSpacing: 0.3)),
+          ]),
         ),
-        title: const Text('Edit Profile', style: TextStyle(color: Colors.black87, fontWeight: FontWeight.w700, fontSize: 18, letterSpacing: 0.2)),
+        actions: const [],
       ),
       bottomNavigationBar: Container(
         decoration: BoxDecoration(color: Colors.white, border: Border(top: BorderSide(color: Colors.grey.shade100, width: 1))),
@@ -244,6 +355,8 @@ class _AdminEditProfileScreenState extends State<AdminEditProfileScreen>
                     },
                   ),
                   const SizedBox(height: 32),
+
+                  // ── SAVE BUTTON ──
                   _isLoading
                       ? Center(child: CircularProgressIndicator(valueColor: AlwaysStoppedAnimation<Color>(Colors.yellow[800]!)))
                       : SizedBox(
@@ -258,6 +371,38 @@ class _AdminEditProfileScreenState extends State<AdminEditProfileScreen>
                             ),
                           ),
                         ),
+
+                  const SizedBox(height: 12),
+
+                  // ── CHANGE PASSWORD BUTTON ──
+                  SizedBox(
+                    height: 56,
+                    child: OutlinedButton.icon(
+                      onPressed: () => Navigator.push(context, MaterialPageRoute(builder: (_) => const ChangePasswordScreen())),
+                      icon: Icon(Icons.lock_outline_rounded, color: Colors.orange[700], size: 20),
+                      label: Text('Change Password', style: TextStyle(fontSize: 15, fontWeight: FontWeight.w600, color: Colors.orange[700])),
+                      style: OutlinedButton.styleFrom(
+                        side: BorderSide(color: Colors.orange.shade200),
+                        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(16)),
+                      ),
+                    ),
+                  ),
+
+                  const SizedBox(height: 12),
+
+                  // ── LOGOUT BUTTON ──
+                  SizedBox(
+                    height: 56,
+                    child: OutlinedButton.icon(
+                      onPressed: _confirmLogout,
+                      icon: Icon(Icons.logout_rounded, color: Colors.red[400], size: 20),
+                      label: Text('Logout', style: TextStyle(fontSize: 15, fontWeight: FontWeight.w600, color: Colors.red[400])),
+                      style: OutlinedButton.styleFrom(
+                        side: BorderSide(color: Colors.red.shade200),
+                        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(16)),
+                      ),
+                    ),
+                  ),
                 ],
               ),
             ),
