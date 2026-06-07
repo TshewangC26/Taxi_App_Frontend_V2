@@ -190,6 +190,44 @@ class _DriverPaymentDetailsScreenState
     }
   }
 
+  // ✅ Reusable error dialog
+  Future<void> _showErrorDialog(String title, String message) async {
+    await showDialog(
+      context: context, barrierDismissible: true,
+      barrierColor: Colors.black.withOpacity(0.5),
+      builder: (ctx) => Dialog(
+        backgroundColor: Colors.transparent, elevation: 0,
+        child: Container(
+          padding: const EdgeInsets.all(28),
+          decoration: BoxDecoration(color: Colors.white, borderRadius: BorderRadius.circular(24)),
+          child: Column(mainAxisSize: MainAxisSize.min, children: [
+            Stack(alignment: Alignment.center, children: [
+              Container(width: 80, height: 80, decoration: BoxDecoration(color: Colors.red[50], shape: BoxShape.circle)),
+              Container(width: 62, height: 62, decoration: BoxDecoration(color: Colors.red[100], shape: BoxShape.circle)),
+              Container(width: 46, height: 46,
+                  decoration: BoxDecoration(color: Colors.red[400], shape: BoxShape.circle),
+                  child: const Icon(Icons.error_outline_rounded, color: Colors.white, size: 22)),
+            ]),
+            const SizedBox(height: 20),
+            Text(title, style: const TextStyle(fontSize: 20, fontWeight: FontWeight.w800, color: Colors.black87)),
+            const SizedBox(height: 8),
+            Text(message, textAlign: TextAlign.center,
+                style: TextStyle(fontSize: 14, color: Colors.grey[500], height: 1.5)),
+            const SizedBox(height: 28),
+            SizedBox(width: double.infinity, height: 50,
+              child: ElevatedButton(
+                onPressed: () => Navigator.of(ctx).pop(),
+                style: ElevatedButton.styleFrom(backgroundColor: Colors.red[400], foregroundColor: Colors.white,
+                    elevation: 0, shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(14))),
+                child: const Text('OK', style: TextStyle(fontSize: 15, fontWeight: FontWeight.w600)),
+              ),
+            ),
+          ]),
+        ),
+      ),
+    );
+  }
+
   Future<void> _pickQRCode() async {
     final ImagePicker picker = ImagePicker();
     final XFile? image = await picker.pickImage(source: ImageSource.gallery, imageQuality: 80);
@@ -221,14 +259,12 @@ class _DriverPaymentDetailsScreenState
           ScaffoldMessenger.of(context).showSnackBar(
             SnackBar(content: const Text('QR Code updated successfully!'), backgroundColor: Colors.yellow[800]));
         } else {
-          ScaffoldMessenger.of(context).showSnackBar(
-            SnackBar(content: const Text('QR Code upload failed!'), backgroundColor: Colors.grey[800]));
+          await _showErrorDialog('Upload Failed', 'Could not upload your QR code.\nPlease try again.');
         }
       }
     } catch (e) {
       if (mounted) {
-        ScaffoldMessenger.of(context).showSnackBar(
-          SnackBar(content: const Text('QR Code upload error!'), backgroundColor: Colors.grey[800]));
+        await _showErrorDialog('Upload Error', 'Something went wrong while uploading your QR code.\nPlease check your connection and try again.');
       }
     }
     if (mounted) setState(() => _isUploadingQR = false);
@@ -252,8 +288,7 @@ class _DriverPaymentDetailsScreenState
             SnackBar(content: const Text('Payment details saved successfully!'), backgroundColor: Colors.yellow[800]));
           Navigator.pop(context);
         } else {
-          ScaffoldMessenger.of(context).showSnackBar(
-            SnackBar(content: Text(driverProvider.errorMessage ?? 'Update failed!'), backgroundColor: Colors.grey[800]));
+          await _showErrorDialog('Save Failed', driverProvider.errorMessage ?? 'Could not save payment details.\nPlease check your details and try again.');
         }
       }
     }

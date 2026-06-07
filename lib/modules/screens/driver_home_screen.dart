@@ -353,17 +353,15 @@ class _DriverHomeScreenState extends State<DriverHomeScreen>
     final profilePhoto   = user?.profilePhoto;
     final totalPending   = driverProvider.nowBookings.length + driverProvider.scheduledBookings.length;
 
-    // ✅ Combine all scheduled bookings from both sources, hide completed/cancelled
-    final allScheduled = [
-      ...driverProvider.scheduledBookings,
-      ...driverProvider.myRides.where((b) => b['booking_type'] == 'scheduled'),
-    ];
+    // ✅ Only show ACCEPTED scheduled rides in reminder (not pending)
     final seen = <int>{};
-    final scheduledBookings = allScheduled.where((b) {
+    final scheduledBookings = driverProvider.myRides.where((b) {
       final id = b['id'] as int? ?? 0;
       final bStatus = b['status'] ?? '';
+      final bType = b['booking_type'] ?? '';
       if (seen.contains(id)) return false;
-      if (bStatus == 'completed' || bStatus == 'cancelled') return false;
+      if (bType != 'scheduled') return false;
+      if (bStatus != 'accepted' && bStatus != 'in_progress') return false;
       seen.add(id);
       return true;
     }).toList();

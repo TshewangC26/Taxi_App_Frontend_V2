@@ -429,17 +429,27 @@ class _BookRideScreenState extends State<BookRideScreen>
     } catch (e) {
       if (mounted) {
         setState(() { _availableDrivers = []; _loadingDrivers = false; });
-        _showSnack('Could not load drivers. Please try again.', isError: true);
+        await _showErrorDialog('Could Not Load Drivers', 'Failed to load available drivers.\nPlease check your connection and try again.');
       }
     }
   }
 
   Future<void> _bookRide() async {
-    if (_pickupLocation == null || _dropoffLocation == null) { _showSnack('Please select pickup and dropoff locations'); return; }
-    if (_vehicleType == null) { _showSnack('Please select a vehicle type'); return; }
-    if (_selectedDriver == null) { _showSnack('Please select a driver'); return; }
+    if (_pickupLocation == null || _dropoffLocation == null) {
+      await _showErrorDialog('Missing Locations', 'Please select both pickup and dropoff locations.');
+      return;
+    }
+    if (_vehicleType == null) {
+      await _showErrorDialog('No Vehicle Selected', 'Please select a vehicle type to continue.');
+      return;
+    }
+    if (_selectedDriver == null) {
+      await _showErrorDialog('No Driver Selected', 'Please select a driver from the list to continue.');
+      return;
+    }
     if (_bookingType == 'scheduled' && (_scheduledDate == null || _scheduledTime == null)) {
-      _showSnack('Please select scheduled date and time'); return;
+      await _showErrorDialog('Missing Schedule', 'Please select both a date and time for your scheduled ride.');
+      return;
     }
     final bookingProvider = Provider.of<BookingProvider>(context, listen: false);
     String? scheduledDateStr;
@@ -463,13 +473,51 @@ class _BookRideScreenState extends State<BookRideScreen>
         PageRouteBuilder(pageBuilder: (_, animation, __) => FadeTransition(opacity: animation, child: const PassengerHomeScreen()),
             transitionDuration: const Duration(milliseconds: 400)), (route) => false);
     } else if (mounted) {
-      _showSnack('Booking failed: ${bookingProvider.errorMessage}', isError: true);
+      await _showErrorDialog('Booking Failed', bookingProvider.errorMessage ?? 'Could not create booking.\nPlease try again.');
     }
   }
 
   void _showSnack(String msg, {bool isError = false}) {
     ScaffoldMessenger.of(context).showSnackBar(
       SnackBar(content: Text(msg), backgroundColor: isError ? Colors.grey[800] : Colors.yellow[800]),
+    );
+  }
+
+  // ✅ Reusable error dialog
+  Future<void> _showErrorDialog(String title, String message) async {
+    await showDialog(
+      context: context, barrierDismissible: true,
+      barrierColor: Colors.black.withOpacity(0.5),
+      builder: (ctx) => Dialog(
+        backgroundColor: Colors.transparent, elevation: 0,
+        child: Container(
+          padding: const EdgeInsets.all(28),
+          decoration: BoxDecoration(color: Colors.white, borderRadius: BorderRadius.circular(24)),
+          child: Column(mainAxisSize: MainAxisSize.min, children: [
+            Stack(alignment: Alignment.center, children: [
+              Container(width: 80, height: 80, decoration: BoxDecoration(color: Colors.yellow[50], shape: BoxShape.circle)),
+              Container(width: 62, height: 62, decoration: BoxDecoration(color: Colors.yellow[100], shape: BoxShape.circle)),
+              Container(width: 46, height: 46,
+                  decoration: BoxDecoration(color: Colors.yellow[800], shape: BoxShape.circle),
+                  child: const Icon(Icons.error_outline_rounded, color: Colors.white, size: 22)),
+            ]),
+            const SizedBox(height: 20),
+            Text(title, style: const TextStyle(fontSize: 20, fontWeight: FontWeight.w800, color: Colors.black87)),
+            const SizedBox(height: 8),
+            Text(message, textAlign: TextAlign.center,
+                style: TextStyle(fontSize: 14, color: Colors.grey[500], height: 1.5)),
+            const SizedBox(height: 28),
+            SizedBox(width: double.infinity, height: 50,
+              child: ElevatedButton(
+                onPressed: () => Navigator.of(ctx).pop(),
+                style: ElevatedButton.styleFrom(backgroundColor: Colors.yellow[800], foregroundColor: Colors.white,
+                    elevation: 0, shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(14))),
+                child: const Text('OK', style: TextStyle(fontSize: 15, fontWeight: FontWeight.w600)),
+              ),
+            ),
+          ]),
+        ),
+      ),
     );
   }
 
@@ -756,7 +804,7 @@ class _BookRideScreenState extends State<BookRideScreen>
                                             }
                                           }
                                         } else {
-                                          _showSnack('Please select a date first');
+                                          await _showErrorDialog('No Date Selected', 'Please select a date before choosing a time.');
                                           return;
                                         }
                                         setState(() => _scheduledTime = time);

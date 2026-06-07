@@ -222,15 +222,52 @@ class _MyBookingsScreenState extends State<MyBookingsScreen>
     }
   }
 
+  // ✅ Reusable error dialog
+  Future<void> _showErrorDialog(String title, String message) async {
+    await showDialog(
+      context: context, barrierDismissible: true,
+      barrierColor: Colors.black.withOpacity(0.5),
+      builder: (ctx) => Dialog(
+        backgroundColor: Colors.transparent, elevation: 0,
+        child: Container(
+          padding: const EdgeInsets.all(28),
+          decoration: BoxDecoration(color: Colors.white, borderRadius: BorderRadius.circular(24)),
+          child: Column(mainAxisSize: MainAxisSize.min, children: [
+            Stack(alignment: Alignment.center, children: [
+              Container(width: 80, height: 80, decoration: BoxDecoration(color: Colors.red[50], shape: BoxShape.circle)),
+              Container(width: 62, height: 62, decoration: BoxDecoration(color: Colors.red[100], shape: BoxShape.circle)),
+              Container(width: 46, height: 46,
+                  decoration: BoxDecoration(color: Colors.red[400], shape: BoxShape.circle),
+                  child: const Icon(Icons.error_outline_rounded, color: Colors.white, size: 22)),
+            ]),
+            const SizedBox(height: 20),
+            Text(title, style: const TextStyle(fontSize: 20, fontWeight: FontWeight.w800, color: Colors.black87)),
+            const SizedBox(height: 8),
+            Text(message, textAlign: TextAlign.center,
+                style: TextStyle(fontSize: 14, color: Colors.grey[500], height: 1.5)),
+            const SizedBox(height: 28),
+            SizedBox(width: double.infinity, height: 50,
+              child: ElevatedButton(
+                onPressed: () => Navigator.of(ctx).pop(),
+                style: ElevatedButton.styleFrom(backgroundColor: Colors.red[400], foregroundColor: Colors.white,
+                    elevation: 0, shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(14))),
+                child: const Text('OK', style: TextStyle(fontSize: 15, fontWeight: FontWeight.w600)),
+              ),
+            ),
+          ]),
+        ),
+      ),
+    );
+  }
+
   // ✅ Call driver
   Future<void> _callDriver(String phone) async {
-    final uri = Uri(scheme: 'tel', path: phone);
+    final cleaned = phone.replaceAll(RegExp(r'[^0-9+]'), '');
+    final uri = Uri(scheme: 'tel', path: cleaned);
     if (await canLaunchUrl(uri)) {
       await launchUrl(uri);
-    } else if (mounted) {
-      ScaffoldMessenger.of(context).showSnackBar(
-        SnackBar(content: Text('Could not launch call to $phone'), backgroundColor: Colors.grey[800]),
-      );
+  } else if (mounted) {
+      await _showErrorDialog('Call Failed', 'Could not open the phone dialer.\nPlease check if your phone supports calls.');
     }
   }
 
@@ -242,9 +279,7 @@ class _MyBookingsScreenState extends State<MyBookingsScreen>
     if (await canLaunchUrl(uri)) {
       await launchUrl(uri, mode: LaunchMode.externalApplication);
     } else if (mounted) {
-      ScaffoldMessenger.of(context).showSnackBar(
-        SnackBar(content: const Text('WhatsApp is not installed'), backgroundColor: Colors.grey[800]),
-      );
+      await _showErrorDialog('WhatsApp Not Found', 'WhatsApp is not installed on this device.\nPlease install WhatsApp and try again.');
     }
   }
 
@@ -801,8 +836,7 @@ class _MyBookingsScreenState extends State<MyBookingsScreen>
         if (context.mounted) ScaffoldMessenger.of(context).showSnackBar(
             SnackBar(content: const Text('Booking removed'), backgroundColor: Colors.grey[800]));
       } catch (e) {
-        if (context.mounted) ScaffoldMessenger.of(context).showSnackBar(
-            SnackBar(content: Text('Error: $e'), backgroundColor: Colors.grey[800]));
+        if (context.mounted) await _showErrorDialog('Remove Failed', 'Could not remove this booking.\nPlease try again.');
       }
     }
   }

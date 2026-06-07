@@ -106,9 +106,9 @@ class _ChangePasswordScreenState extends State<ChangePasswordScreen> {
       if (mounted) {
         if (success) {
           ScaffoldMessenger.of(context).showSnackBar(
-            const SnackBar(
-              content: Text('Password changed successfully!'),
-              backgroundColor: Colors.green,
+            SnackBar(
+              content: const Text('Password changed successfully!'),
+              backgroundColor: Colors.yellow[800],
             ),
           );
           Navigator.pop(context);

@@ -8,6 +8,9 @@
     <!-- ✅ Notification permission for Android 13+ -->
     <uses-permission android:name="android.permission.POST_NOTIFICATIONS"/>
 
+    <!-- ✅ Phone call permission -->
+    <uses-permission android:name="android.permission.CALL_PHONE"/>
+
     <application
         android:label="Easy Ride"
         android:name="${applicationName}"
@@ -49,10 +52,23 @@
             android:name="flutterEmbedding"
             android:value="2" />
     </application>
+
     <queries>
         <intent>
             <action android:name="android.intent.action.PROCESS_TEXT"/>
             <data android:mimeType="text/plain"/>
+        </intent>
+        <!-- ✅ Allow launching WhatsApp -->
+        <intent>
+            <action android:name="android.intent.action.VIEW"/>
+            <data android:scheme="https"/>
+        </intent>
+        <!-- ✅ Allow phone calls -->
+        <intent>
+            <action android:name="android.intent.action.DIAL"/>
+        </intent>
+        <intent>
+            <action android:name="android.intent.action.CALL"/>
         </intent>
     </queries>
 </manifest>
