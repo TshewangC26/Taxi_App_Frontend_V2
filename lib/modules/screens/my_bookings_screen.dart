@@ -16,6 +16,7 @@ import 'book_ride_screen.dart';
 import 'profile_screen.dart';
 import 'login_screens.dart';
 import 'contact_us_screen.dart';
+import 'package:url_launcher/url_launcher.dart';
 import 'about_us_screen.dart';
 
 class MyBookingsScreen extends StatefulWidget {
@@ -218,6 +219,32 @@ class _MyBookingsScreenState extends State<MyBookingsScreen>
           PageRouteBuilder(pageBuilder: (_, animation, __) => FadeTransition(opacity: animation, child: const LoginScreen()),
               transitionDuration: const Duration(milliseconds: 500)), (route) => false);
       }
+    }
+  }
+
+  // ✅ Call driver
+  Future<void> _callDriver(String phone) async {
+    final uri = Uri(scheme: 'tel', path: phone);
+    if (await canLaunchUrl(uri)) {
+      await launchUrl(uri);
+    } else if (mounted) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(content: Text('Could not launch call to $phone'), backgroundColor: Colors.grey[800]),
+      );
+    }
+  }
+
+  // ✅ WhatsApp driver
+  Future<void> _whatsappDriver(String phone) async {
+    String cleaned = phone.replaceAll(RegExp(r'[^0-9]'), '');
+    if (!cleaned.startsWith('975')) cleaned = '975$cleaned';
+    final uri = Uri.parse('https://wa.me/$cleaned');
+    if (await canLaunchUrl(uri)) {
+      await launchUrl(uri, mode: LaunchMode.externalApplication);
+    } else if (mounted) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(content: const Text('WhatsApp is not installed'), backgroundColor: Colors.grey[800]),
+      );
     }
   }
 
@@ -889,9 +916,44 @@ class _MyBookingsScreenState extends State<MyBookingsScreen>
     );
     if (result != null && context.mounted) {
       final bookingProvider = Provider.of<BookingProvider>(context, listen: false);
+
+      // ✅ Find the booking before cancelling
+      final cancelledBooking = bookingProvider.bookings.firstWhere(
+        (b) => b.id == bookingId,
+        orElse: () => bookingProvider.bookings.first,
+      );
+
+      // ✅ Check if scheduled time has already passed (driver didn't show up)
+      bool isDriverNoShow = false;
+      try {
+        final dateStr = cancelledBooking.scheduledDate ?? '';
+        final timeStr = cancelledBooking.scheduledTime ?? '';
+        if (dateStr.isNotEmpty && timeStr.isNotEmpty) {
+          final parts = timeStr.split(':');
+          final hour = int.parse(parts[0]);
+          final minute = int.parse(parts[1]);
+          final scheduledDateTime = DateTime.parse(dateStr).copyWith(hour: hour, minute: minute);
+          isDriverNoShow = DateTime.now().isAfter(scheduledDateTime);
+        }
+      } catch (_) {}
+
       final success = await bookingProvider.cancelBooking(bookingId, reason: result);
-      if (success && context.mounted) ScaffoldMessenger.of(context).showSnackBar(
-          SnackBar(content: const Text('Scheduled booking cancelled'), backgroundColor: Colors.grey[800]));
+      if (success && context.mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+            SnackBar(content: const Text('Scheduled booking cancelled'), backgroundColor: Colors.grey[800]));
+
+        // ✅ Show rating only if driver didn't show up (time has passed)
+        if (isDriverNoShow) {
+          await bookingProvider.getPassengerBookings();
+          final updatedBooking = bookingProvider.bookings.firstWhere(
+            (b) => b.id == bookingId,
+            orElse: () => cancelledBooking,
+          );
+          Future.delayed(const Duration(milliseconds: 800), () {
+            if (mounted) _showScheduledCancellationDialog(updatedBooking, result);
+          });
+        }
+      }
     }
   }
 
@@ -1164,7 +1226,46 @@ class _MyBookingsScreenState extends State<MyBookingsScreen>
           ],
 
           if (isScheduled && (isPending || isAccepted)) ...[
-            const SizedBox(height: 14),
+            // ✅ Driver contact card
+            if (booking.driverPhone != null && booking.driverPhone!.isNotEmpty) ...[
+              const SizedBox(height: 14),
+              Container(
+                width: double.infinity,
+                padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 12),
+                decoration: BoxDecoration(
+                  color: Colors.grey[50],
+                  borderRadius: BorderRadius.circular(12),
+                  border: Border.all(color: Colors.grey.shade200),
+                ),
+                child: Row(children: [
+                  Container(width: 38, height: 38,
+                      decoration: BoxDecoration(color: Colors.yellow[50], shape: BoxShape.circle),
+                      child: Icon(Icons.drive_eta_rounded, color: Colors.yellow[800], size: 20)),
+                  const SizedBox(width: 10),
+                  Expanded(child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
+                    const Text('Your Driver', style: TextStyle(fontWeight: FontWeight.w700, fontSize: 13, color: Colors.black87)),
+                    const SizedBox(height: 2),
+                    Text(booking.driverPhone!, style: TextStyle(fontSize: 12, color: Colors.grey[600])),
+                  ])),
+                  // ✅ Call button
+                  GestureDetector(
+                    onTap: () => _callDriver(booking.driverPhone!),
+                    child: Container(width: 38, height: 38,
+                        decoration: BoxDecoration(color: const Color(0xFF2E7D32).withOpacity(0.1), shape: BoxShape.circle),
+                        child: const Icon(Icons.call_rounded, color: Color(0xFF2E7D32), size: 18)),
+                  ),
+                  const SizedBox(width: 8),
+                  // ✅ WhatsApp button
+                  GestureDetector(
+                    onTap: () => _whatsappDriver(booking.driverPhone!),
+                    child: Container(width: 38, height: 38,
+                        decoration: BoxDecoration(color: const Color(0xFF25D366).withOpacity(0.1), shape: BoxShape.circle),
+                        child: const Icon(Icons.chat_rounded, color: Color(0xFF25D366), size: 18)),
+                  ),
+                ]),
+              ),
+            ],
+            const SizedBox(height: 10),
             SizedBox(width: double.infinity, height: 44,
               child: OutlinedButton.icon(
                 onPressed: () => _cancelScheduledBookingWithReason(context, booking.id),

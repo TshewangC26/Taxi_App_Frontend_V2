@@ -17,7 +17,7 @@ class Booking {
   final double? passengerLongitude;
   // ✅ Rating field
   final int? rating;
-    // ✅ Driver phone for contact
+  // ✅ Driver phone for contact
   final String? driverPhone;
 
   Booking({
@@ -67,6 +67,7 @@ class Booking {
       rating: json['rating'] != null
           ? int.tryParse(json['rating'].toString())
           : null,
+      // ✅ Parse driver phone from API response
       driverPhone: json['driver_phone']?.toString(),
     );
   }
