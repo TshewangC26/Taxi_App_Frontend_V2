@@ -91,15 +91,25 @@ class _DriverAvailableRidesScreenState
   }
 
   Future<void> _callPassenger(String phone) async {
-    final uri = Uri.parse('tel:$phone');
+    final cleaned = phone.replaceAll(RegExp(r'[^0-9+]'), '');
+    final uri = Uri(scheme: 'tel', path: cleaned);
     if (await canLaunchUrl(uri)) {
       await launchUrl(uri);
     } else {
       if (mounted) {
-        ScaffoldMessenger.of(context).showSnackBar(
-          const SnackBar(content: Text('Could not open phone dialer')),
-        );
+        await _showErrorDialog('Call Failed', 'Could not open the phone dialer.\nPlease check if your phone supports calls.');
       }
+    }
+  }
+
+  Future<void> _whatsappPassenger(String phone) async {
+    String cleaned = phone.replaceAll(RegExp(r'[^0-9]'), '');
+    if (!cleaned.startsWith('975')) cleaned = '975$cleaned';
+    final uri = Uri.parse('https://wa.me/$cleaned');
+    if (await canLaunchUrl(uri)) {
+      await launchUrl(uri, mode: LaunchMode.externalApplication);
+    } else if (mounted) {
+      await _showErrorDialog('WhatsApp Not Found', 'WhatsApp is not installed on this device.\nPlease install WhatsApp and try again.');
     }
   }
 
@@ -144,7 +154,6 @@ class _DriverAvailableRidesScreenState
     ));
   }
 
-  // ✅ Hamburger menu
   void _openMenu() {
     showModalBottomSheet(
       context: context,
@@ -240,7 +249,9 @@ class _DriverAvailableRidesScreenState
       builder: (ctx) => Dialog(
         backgroundColor: Colors.transparent,
         elevation: 0,
+        insetPadding: const EdgeInsets.symmetric(horizontal: 20, vertical: 24),
         child: Container(
+          width: double.infinity,
           padding: const EdgeInsets.all(28),
           decoration: BoxDecoration(color: Colors.white, borderRadius: BorderRadius.circular(24)),
           child: Column(mainAxisSize: MainAxisSize.min, children: [
@@ -319,7 +330,9 @@ class _DriverAvailableRidesScreenState
       builder: (ctx) => Dialog(
         backgroundColor: Colors.transparent,
         elevation: 0,
+        insetPadding: const EdgeInsets.symmetric(horizontal: 20, vertical: 24),
         child: Container(
+          width: double.infinity,
           padding: const EdgeInsets.all(28),
           decoration: BoxDecoration(color: Colors.white, borderRadius: BorderRadius.circular(24)),
           child: Column(mainAxisSize: MainAxisSize.min, children: [
@@ -370,14 +383,15 @@ class _DriverAvailableRidesScreenState
     );
   }
 
-  // ✅ Reusable error dialog
   Future<void> _showErrorDialog(String title, String message) async {
     await showDialog(
       context: context, barrierDismissible: true,
       barrierColor: Colors.black.withOpacity(0.5),
       builder: (ctx) => Dialog(
         backgroundColor: Colors.transparent, elevation: 0,
+        insetPadding: const EdgeInsets.symmetric(horizontal: 20, vertical: 24),
         child: Container(
+          width: double.infinity,
           padding: const EdgeInsets.all(28),
           decoration: BoxDecoration(color: Colors.white, borderRadius: BorderRadius.circular(24)),
           child: Column(mainAxisSize: MainAxisSize.min, children: [
@@ -416,7 +430,9 @@ class _DriverAvailableRidesScreenState
       builder: (ctx) => Dialog(
         backgroundColor: Colors.transparent,
         elevation: 0,
+        insetPadding: const EdgeInsets.symmetric(horizontal: 20, vertical: 24),
         child: Container(
+          width: double.infinity,
           padding: const EdgeInsets.all(24),
           decoration: BoxDecoration(color: Colors.white, borderRadius: BorderRadius.circular(24)),
           child: Column(mainAxisSize: MainAxisSize.min, crossAxisAlignment: CrossAxisAlignment.start, children: [
@@ -652,7 +668,9 @@ class _DriverAvailableRidesScreenState
       builder: (ctx) => Dialog(
         backgroundColor: Colors.transparent,
         elevation: 0,
+        insetPadding: const EdgeInsets.symmetric(horizontal: 20, vertical: 24),
         child: Container(
+          width: double.infinity,
           padding: const EdgeInsets.all(24),
           decoration: BoxDecoration(color: Colors.white, borderRadius: BorderRadius.circular(24)),
           child: Column(mainAxisSize: MainAxisSize.min, children: [
@@ -707,7 +725,9 @@ class _DriverAvailableRidesScreenState
       builder: (ctx) => Dialog(
         backgroundColor: Colors.transparent,
         elevation: 0,
+        insetPadding: const EdgeInsets.symmetric(horizontal: 20, vertical: 24),
         child: Container(
+          width: double.infinity,
           padding: const EdgeInsets.all(24),
           decoration: BoxDecoration(color: Colors.white, borderRadius: BorderRadius.circular(24)),
           child: Column(mainAxisSize: MainAxisSize.min, children: [
@@ -745,7 +765,9 @@ class _DriverAvailableRidesScreenState
       builder: (ctx) => Dialog(
         backgroundColor: Colors.transparent,
         elevation: 0,
+        insetPadding: const EdgeInsets.symmetric(horizontal: 20, vertical: 24),
         child: Container(
+          width: double.infinity,
           padding: const EdgeInsets.all(24),
           decoration: BoxDecoration(color: Colors.white, borderRadius: BorderRadius.circular(24)),
           child: SingleChildScrollView(
@@ -853,7 +875,7 @@ class _DriverAvailableRidesScreenState
         centerTitle: false,
         titleSpacing: 20,
         automaticallyImplyLeading: false,
-       title: GestureDetector(
+        title: GestureDetector(
           onTap: () {
             Navigator.pushAndRemoveUntil(
               context,
@@ -873,8 +895,6 @@ class _DriverAvailableRidesScreenState
           ]),
         ),
         actions: [
-         
-          // ✅ Hamburger menu replaces logout button
           Padding(
             padding: const EdgeInsets.only(right: 12, left: 4),
             child: InkWell(
@@ -1131,6 +1151,7 @@ class _DriverAvailableRidesScreenState
         booking['passenger']?['phone']?.toString() ??
         booking['passenger']?['phone_number']?.toString() ??
         booking['passenger']?['mobile']?.toString() ?? '';
+    final passengerName = booking['passenger']?['name'] ?? 'Unknown Passenger';
 
     return Container(
       margin: const EdgeInsets.only(bottom: 14),
@@ -1168,16 +1189,55 @@ class _DriverAvailableRidesScreenState
             ),
           ],
 
-          Row(children: [
-            Container(width: 32, height: 32,
-                decoration: BoxDecoration(color: Colors.grey[100], shape: BoxShape.circle),
-                child: Icon(Icons.person_rounded, size: 18, color: Colors.grey[500])),
-            const SizedBox(width: 10),
-            Text(booking['passenger']?['name'] ?? 'Unknown Passenger',
-                style: const TextStyle(fontWeight: FontWeight.w600, fontSize: 13, color: Colors.black87)),
-          ]),
-
-          const SizedBox(height: 12),
+          // ✅ Passenger info card with circular call & whatsapp buttons
+          if (cardType == 'active' && _nearPassenger && passengerPhone.isNotEmpty) ...[
+            Container(
+              width: double.infinity,
+              padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 12),
+              margin: const EdgeInsets.only(bottom: 12),
+              decoration: BoxDecoration(
+                color: Colors.grey[50],
+                borderRadius: BorderRadius.circular(12),
+                border: Border.all(color: Colors.grey.shade200),
+              ),
+              child: Row(children: [
+                Container(width: 38, height: 38,
+                    decoration: BoxDecoration(color: Colors.yellow[50], shape: BoxShape.circle),
+                    child: Icon(Icons.person_rounded, color: Colors.yellow[800], size: 20)),
+                const SizedBox(width: 10),
+                Expanded(child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
+                  Text(passengerName, style: const TextStyle(fontWeight: FontWeight.w700, fontSize: 13, color: Colors.black87)),
+                  const SizedBox(height: 2),
+                  Text(passengerPhone, style: TextStyle(fontSize: 12, color: Colors.grey[600])),
+                ])),
+                // ✅ Call button
+                GestureDetector(
+                  onTap: () => _callPassenger(passengerPhone),
+                  child: Container(width: 38, height: 38,
+                      decoration: BoxDecoration(color: const Color(0xFF2E7D32).withOpacity(0.1), shape: BoxShape.circle),
+                      child: const Icon(Icons.call_rounded, color: Color(0xFF2E7D32), size: 18)),
+                ),
+                const SizedBox(width: 8),
+                // ✅ WhatsApp button
+                GestureDetector(
+                  onTap: () => _whatsappPassenger(passengerPhone),
+                  child: Container(width: 38, height: 38,
+                      decoration: BoxDecoration(color: const Color(0xFF25D366).withOpacity(0.1), shape: BoxShape.circle),
+                      child: const Icon(Icons.chat_rounded, color: Color(0xFF25D366), size: 18)),
+                ),
+              ]),
+            ),
+          ] else ...[
+            Row(children: [
+              Container(width: 32, height: 32,
+                  decoration: BoxDecoration(color: Colors.grey[100], shape: BoxShape.circle),
+                  child: Icon(Icons.person_rounded, size: 18, color: Colors.grey[500])),
+              const SizedBox(width: 10),
+              Text(passengerName,
+                  style: const TextStyle(fontWeight: FontWeight.w600, fontSize: 13, color: Colors.black87)),
+            ]),
+            const SizedBox(height: 12),
+          ],
 
           Row(children: [
             Container(width: 8, height: 8, decoration: const BoxDecoration(color: Color(0xFF4CAF50), shape: BoxShape.circle)),
@@ -1218,54 +1278,6 @@ class _DriverAvailableRidesScreenState
           ]),
 
           const SizedBox(height: 16),
-
-          if (cardType == 'active' && _nearPassenger) ...[
-            // ✅ Call Passenger button
-            SizedBox(width: double.infinity, height: 48,
-              child: ElevatedButton.icon(
-                onPressed: () async {
-                  if (passengerPhone.isNotEmpty) {
-                    _callPassenger(passengerPhone);
-                  } else {
-                    await _showErrorDialog('No Phone Number', 'Passenger phone number is not available.');
-                  }
-                },
-                icon: const Icon(Icons.call_rounded, size: 20),
-                label: const Text('Call Passenger', style: TextStyle(fontSize: 14, fontWeight: FontWeight.w600)),
-                style: ElevatedButton.styleFrom(
-                  backgroundColor: Colors.green[600], foregroundColor: Colors.white,
-                  elevation: 0, shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
-                ),
-              ),
-            ),
-            const SizedBox(height: 10),
-            // ✅ WhatsApp Passenger button
-            SizedBox(width: double.infinity, height: 48,
-              child: ElevatedButton.icon(
-                onPressed: () async {
-                  if (passengerPhone.isNotEmpty) {
-                    String cleaned = passengerPhone.replaceAll(RegExp(r'[^0-9]'), '');
-                    if (!cleaned.startsWith('975')) cleaned = '975$cleaned';
-                    final uri = Uri.parse('https://wa.me/$cleaned');
-                    if (await canLaunchUrl(uri)) {
-                      await launchUrl(uri, mode: LaunchMode.externalApplication);
-                    } else if (context.mounted) {
-                      await _showErrorDialog('WhatsApp Not Found', 'WhatsApp is not installed on this device.\nPlease install WhatsApp and try again.');
-                    }
-                  } else {
-                    await _showErrorDialog('No Phone Number', 'Passenger phone number is not available.');
-                  }
-                },
-                icon: const Icon(Icons.chat_rounded, size: 20),
-                label: const Text('WhatsApp Passenger', style: TextStyle(fontSize: 14, fontWeight: FontWeight.w600)),
-                style: ElevatedButton.styleFrom(
-                  backgroundColor: const Color(0xFF25D366), foregroundColor: Colors.white,
-                  elevation: 0, shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
-                ),
-              ),
-            ),
-            const SizedBox(height: 10),
-          ],
 
           if (cardType == 'pending')
             Row(children: [

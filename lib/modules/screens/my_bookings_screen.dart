@@ -641,8 +641,10 @@ class _MyBookingsScreenState extends State<MyBookingsScreen>
       builder: (ctx) => StatefulBuilder(
         builder: (ctx, setDialogState) => Dialog(
           backgroundColor: Colors.transparent, elevation: 0,
+          insetPadding: const EdgeInsets.symmetric(horizontal: 20, vertical: 24),
           child: Container(
-            padding: const EdgeInsets.all(28),
+            width: double.infinity,
+            padding: const EdgeInsets.all(24),
             decoration: BoxDecoration(color: Colors.white, borderRadius: BorderRadius.circular(24)),
             child: Column(mainAxisSize: MainAxisSize.min, children: [
               Stack(alignment: Alignment.center, children: [
@@ -799,9 +801,11 @@ class _MyBookingsScreenState extends State<MyBookingsScreen>
     final confirmed = await showDialog<bool>(
       context: context, barrierColor: Colors.black.withOpacity(0.5),
       builder: (ctx) => Dialog(
-        backgroundColor: Colors.transparent, elevation: 0,
-        child: Container(
-          padding: const EdgeInsets.all(28),
+          backgroundColor: Colors.transparent, elevation: 0,
+          insetPadding: const EdgeInsets.symmetric(horizontal: 20, vertical: 24),
+          child: Container(
+            width: double.infinity,
+            padding: const EdgeInsets.all(24),
           decoration: BoxDecoration(color: Colors.white, borderRadius: BorderRadius.circular(24)),
           child: Column(mainAxisSize: MainAxisSize.min, children: [
             Container(width: 56, height: 56, decoration: BoxDecoration(color: Colors.red[50], shape: BoxShape.circle),

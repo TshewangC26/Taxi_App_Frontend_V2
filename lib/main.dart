@@ -2,6 +2,7 @@ import 'package:firebase_core/firebase_core.dart';
 import 'package:firebase_messaging/firebase_messaging.dart';
 import 'package:flutter/material.dart';
 import 'package:provider/provider.dart';
+import 'package:flutter_screenutil/flutter_screenutil.dart';
 import 'firebase_options.dart';
 import 'modules/providers/auth_provider.dart';
 import 'modules/providers/booking_provider.dart';
@@ -95,7 +96,11 @@ class MyApp extends StatelessWidget {
         ChangeNotifierProvider(create: (_) => RouteProvider()),
         ChangeNotifierProvider(create: (_) => DriverProvider()),
       ],
-      child: MaterialApp(
+      child: ScreenUtilInit(
+        designSize: const Size(375, 812),
+        minTextAdapt: true,
+        splitScreenMode: true,
+        builder: (context, child) => MaterialApp(
         title: 'Online Taxi Service',
         navigatorKey: navigatorKey,
         theme: ThemeData(
@@ -146,6 +151,7 @@ class MyApp extends StatelessWidget {
         ),
         debugShowCheckedModeBanner: false,
         home: const SplashScreen(),
+        ),
       ),
     );
   }

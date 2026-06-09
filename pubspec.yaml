@@ -25,6 +25,7 @@ dependencies:
   url_launcher: ^6.3.0
   flutter_launcher_icons: ^0.13.1
   location: ^8.0.1
+  flutter_screenutil: ^5.9.0
 
 dev_dependencies:
   flutter_test:
