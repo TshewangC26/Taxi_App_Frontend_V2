@@ -473,7 +473,26 @@ class _BookRideScreenState extends State<BookRideScreen>
         PageRouteBuilder(pageBuilder: (_, animation, __) => FadeTransition(opacity: animation, child: const PassengerHomeScreen()),
             transitionDuration: const Duration(milliseconds: 400)), (route) => false);
     } else if (mounted) {
-      await _showErrorDialog('Booking Failed', bookingProvider.errorMessage ?? 'Could not create booking.\nPlease try again.');
+      final rawError = bookingProvider.errorMessage ?? '';
+      String friendlyMessage = 'Could not create booking.\nPlease try again.';
+
+      if (rawError.contains('Route not found')) {
+        friendlyMessage = 'No route found between the selected locations.\nPlease choose a different pickup or dropoff.';
+      } else if (rawError.contains('already have an active') || rawError.contains('active booking')) {
+        friendlyMessage = 'You already have an active booking.\nPlease complete or cancel it before booking again.';
+      } else if (rawError.contains('No drivers available') || rawError.contains('no drivers')) {
+        friendlyMessage = 'No drivers are available right now.\nPlease try again in a few minutes.';
+      } else if (rawError.contains('network') || rawError.contains('connection') || rawError.contains('SocketException')) {
+        friendlyMessage = 'No internet connection.\nPlease check your network and try again.';
+      } else if (rawError.contains('Unauthenticated') || rawError.contains('401')) {
+        friendlyMessage = 'Your session has expired.\nPlease log in again.';
+      } else if (rawError.contains('scheduled') || rawError.contains('time')) {
+        friendlyMessage = 'Invalid schedule time.\nPlease select a valid date and time.';
+      } else if (rawError.isNotEmpty && !rawError.contains('Exception') && !rawError.contains('{')) {
+        friendlyMessage = rawError;
+      }
+
+      await _showErrorDialog('Booking Failed', friendlyMessage);
     }
   }
 
@@ -842,7 +861,7 @@ class _BookRideScreenState extends State<BookRideScreen>
                                             padding: const EdgeInsets.all(28),
                                             decoration: BoxDecoration(color: Colors.white, borderRadius: BorderRadius.circular(16), border: Border.all(color: Colors.grey.shade100)),
                                             child: Column(children: [
-                                              Icon(Icons.no_transfer_rounded, size: 44, color: Colors.grey[300]),
+                                              Icon(Icons.local_taxi_rounded, size: 44, color: Colors.grey[300]),
                                               const SizedBox(height: 10),
                                               Text(
                                                 _bookingType == 'scheduled' ? 'No available drivers' : 'No drivers available within 18km',

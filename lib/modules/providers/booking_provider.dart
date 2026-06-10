@@ -5,6 +5,11 @@ import '../services/api_service.dart';
 class BookingProvider with ChangeNotifier {
   final ApiService _apiService = ApiService();
 
+  String _clean(dynamic e) {
+    final msg = e.toString();
+    return msg.startsWith('Exception: ') ? msg.substring(11) : msg;
+  }
+
   List<Booking> _bookings = [];
   bool _isLoading = false;
   String? _errorMessage;
@@ -52,7 +57,7 @@ class BookingProvider with ChangeNotifier {
       notifyListeners();
       return true;
     } catch (e) {
-      _errorMessage = e.toString();
+      _errorMessage = _clean(e);
       _isLoading = false;
       notifyListeners();
       return false;

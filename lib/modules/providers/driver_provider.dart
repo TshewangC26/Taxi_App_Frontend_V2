@@ -10,6 +10,11 @@ import '../services/firebase_services.dart';
 class DriverProvider with ChangeNotifier {
   final ApiService _apiService = ApiService();
 
+  String _clean(dynamic e) {
+    final msg = e.toString();
+    return msg.startsWith('Exception: ') ? msg.substring(11) : msg;
+  }
+
   bool _isAvailable = false;
   String _driverStatus = 'offline';
   bool _isLoading = false;
@@ -61,7 +66,7 @@ class DriverProvider with ChangeNotifier {
 
       notifyListeners();
     } catch (e) {
-      _errorMessage = e.toString();
+      _errorMessage = _clean(e);
       _isLoading    = false;
       notifyListeners();
     }

@@ -16,6 +16,11 @@ class AuthProvider with ChangeNotifier {
   bool get isAuthenticated => _user != null;
   String? get resetUserName => _resetUserName;
 
+  String _clean(dynamic e) {
+    final msg = e.toString();
+    return msg.startsWith('Exception: ') ? msg.substring(11) : msg;
+  }
+
   Future<bool> register({
     required String name,
     required String email,
@@ -58,7 +63,7 @@ class AuthProvider with ChangeNotifier {
       notifyListeners();
       return true;
     } catch (e) {
-      _errorMessage = e.toString();
+     _errorMessage = _clean(e);
       _isLoading    = false;
       notifyListeners();
       return false;

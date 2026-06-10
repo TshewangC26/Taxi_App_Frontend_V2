@@ -266,7 +266,7 @@ class _MyBookingsScreenState extends State<MyBookingsScreen>
     final uri = Uri(scheme: 'tel', path: cleaned);
     if (await canLaunchUrl(uri)) {
       await launchUrl(uri);
-  } else if (mounted) {
+    } else if (mounted) {
       await _showErrorDialog('Call Failed', 'Could not open the phone dialer.\nPlease check if your phone supports calls.');
     }
   }
@@ -465,7 +465,6 @@ class _MyBookingsScreenState extends State<MyBookingsScreen>
               _scheduledCancelDialogShown.add(booking.id);
               Future.delayed(const Duration(milliseconds: 800), () async {
                 if (!mounted) return;
-                // Fetch cancellation reason from API
                 String? reason;
                 try {
                   final response = await _apiService.get('/bookings/${booking.id}');
@@ -484,7 +483,7 @@ class _MyBookingsScreenState extends State<MyBookingsScreen>
     });
   }
 
-  // ✅ New dialog: shows cancellation reason + star rating for scheduled bookings
+  // ✅ Cancellation dialog with reason + star rating for scheduled bookings
   Future<void> _showScheduledCancellationDialog(Booking booking, String? reason) async {
     int selectedRating = 0;
 
@@ -500,22 +499,17 @@ class _MyBookingsScreenState extends State<MyBookingsScreen>
             padding: const EdgeInsets.all(24),
             decoration: BoxDecoration(color: Colors.white, borderRadius: BorderRadius.circular(24)),
             child: Column(mainAxisSize: MainAxisSize.min, children: [
-
-              // ❌ Icon
               Stack(alignment: Alignment.center, children: [
                 Container(width: 80, height: 80, decoration: BoxDecoration(color: Colors.red[50], shape: BoxShape.circle)),
                 Container(width: 62, height: 62, decoration: BoxDecoration(color: Colors.red[100], shape: BoxShape.circle)),
                 Container(width: 46, height: 46, decoration: BoxDecoration(color: Colors.red[400], shape: BoxShape.circle),
                     child: const Icon(Icons.cancel_rounded, color: Colors.white, size: 24)),
               ]),
-
               const SizedBox(height: 16),
               const Text('Ride Cancelled', style: TextStyle(fontSize: 20, fontWeight: FontWeight.w800, color: Colors.black87)),
               const SizedBox(height: 6),
               Text('Your scheduled ride was cancelled by the driver.',
                   textAlign: TextAlign.center, style: TextStyle(fontSize: 13, color: Colors.grey[500])),
-
-              // ✅ Cancellation reason box
               if (reason != null && reason.isNotEmpty) ...[
                 const SizedBox(height: 16),
                 Container(
@@ -537,8 +531,6 @@ class _MyBookingsScreenState extends State<MyBookingsScreen>
                   ]),
                 ),
               ],
-
-              // ✅ Star rating section
               const SizedBox(height: 20),
               Text('Rate the driver', style: TextStyle(fontSize: 14, fontWeight: FontWeight.w700, color: Colors.grey[700])),
               const SizedBox(height: 4),
@@ -575,10 +567,8 @@ class _MyBookingsScreenState extends State<MyBookingsScreen>
                   color: selectedRating == 0 ? Colors.grey[400] : Colors.yellow[800],
                 ),
               ),
-
               const SizedBox(height: 20),
               Row(children: [
-                // Skip button
                 Expanded(
                   child: OutlinedButton(
                     onPressed: () => Navigator.of(ctx).pop(),
@@ -592,7 +582,6 @@ class _MyBookingsScreenState extends State<MyBookingsScreen>
                   ),
                 ),
                 const SizedBox(width: 12),
-                // Submit button (only active if star selected)
                 Expanded(
                   child: ElevatedButton(
                     onPressed: selectedRating == 0 ? null : () async {
@@ -954,14 +943,10 @@ class _MyBookingsScreenState extends State<MyBookingsScreen>
     );
     if (result != null && context.mounted) {
       final bookingProvider = Provider.of<BookingProvider>(context, listen: false);
-
-      // ✅ Find the booking before cancelling
       final cancelledBooking = bookingProvider.bookings.firstWhere(
         (b) => b.id == bookingId,
         orElse: () => bookingProvider.bookings.first,
       );
-
-      // ✅ Check if scheduled time has already passed (driver didn't show up)
       bool isDriverNoShow = false;
       try {
         final dateStr = cancelledBooking.scheduledDate ?? '';
@@ -979,8 +964,6 @@ class _MyBookingsScreenState extends State<MyBookingsScreen>
       if (success && context.mounted) {
         ScaffoldMessenger.of(context).showSnackBar(
             SnackBar(content: const Text('Scheduled booking cancelled'), backgroundColor: Colors.grey[800]));
-
-        // ✅ Show rating only if driver didn't show up (time has passed)
         if (isDriverNoShow) {
           await bookingProvider.getPassengerBookings();
           final updatedBooking = bookingProvider.bookings.firstWhere(
@@ -1011,7 +994,7 @@ class _MyBookingsScreenState extends State<MyBookingsScreen>
       appBar: AppBar(
         backgroundColor: Colors.white, elevation: 0, centerTitle: false,
         titleSpacing: 20, automaticallyImplyLeading: false,
-      title: GestureDetector(
+        title: GestureDetector(
           onTap: () {
             Navigator.pushAndRemoveUntil(
               context,
@@ -1195,7 +1178,7 @@ class _MyBookingsScreenState extends State<MyBookingsScreen>
                 Text(statusLabel, style: TextStyle(color: statusColor, fontWeight: FontWeight.w700, fontSize: 12)),
               ]),
             ),
-            Text('#${booking.id}', style: TextStyle(color: Colors.grey[400], fontSize: 12, fontWeight: FontWeight.w500)),
+            const SizedBox(width: 34),
           ]),
 
           const SizedBox(height: 14),
@@ -1235,15 +1218,37 @@ class _MyBookingsScreenState extends State<MyBookingsScreen>
 
           const SizedBox(height: 14),
 
+          // ✅ Vehicle type + vehicle number row
           Row(mainAxisAlignment: MainAxisAlignment.spaceBetween, children: [
-            Container(
-              padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 5),
-              decoration: BoxDecoration(color: Colors.grey[100], borderRadius: BorderRadius.circular(8)),
-              child: Row(children: [
-                Icon(Icons.directions_car_outlined, size: 14, color: Colors.grey[600]), const SizedBox(width: 5),
-                Text(booking.vehicleType, style: TextStyle(fontSize: 12, color: Colors.grey[700], fontWeight: FontWeight.w500)),
-              ]),
-            ),
+            Row(children: [
+              Container(
+                padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 5),
+                decoration: BoxDecoration(color: Colors.grey[100], borderRadius: BorderRadius.circular(8)),
+                child: Row(children: [
+                  Icon(Icons.directions_car_outlined, size: 14, color: Colors.grey[600]),
+                  const SizedBox(width: 5),
+                  Text(booking.vehicleType, style: TextStyle(fontSize: 12, color: Colors.grey[700], fontWeight: FontWeight.w500)),
+                ]),
+              ),
+              // ✅ Show vehicle number if available
+              if (booking.driverVehicleNumber != null && booking.driverVehicleNumber!.isNotEmpty) ...[
+                const SizedBox(width: 8),
+                Container(
+                  padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 5),
+                  decoration: BoxDecoration(
+                    color: Colors.yellow[50],
+                    borderRadius: BorderRadius.circular(8),
+                    border: Border.all(color: Colors.yellow[200]!),
+                  ),
+                  child: Row(mainAxisSize: MainAxisSize.min, children: [
+                    Icon(Icons.confirmation_number_outlined, size: 13, color: Colors.yellow[800]),
+                    const SizedBox(width: 4),
+                    Text(booking.driverVehicleNumber!,
+                        style: TextStyle(fontSize: 12, color: Colors.yellow[800], fontWeight: FontWeight.w700)),
+                  ]),
+                ),
+              ],
+            ]),
             Text('Nu. ${booking.finalPrice ?? booking.estimatedPrice}',
                 style: TextStyle(fontSize: 18, fontWeight: FontWeight.w800, color: Colors.yellow[800])),
           ]),
@@ -1264,7 +1269,6 @@ class _MyBookingsScreenState extends State<MyBookingsScreen>
           ],
 
           if (isScheduled && (isPending || isAccepted)) ...[
-            // ✅ Driver contact card
             if (booking.driverPhone != null && booking.driverPhone!.isNotEmpty) ...[
               const SizedBox(height: 14),
               Container(
@@ -1285,7 +1289,6 @@ class _MyBookingsScreenState extends State<MyBookingsScreen>
                     const SizedBox(height: 2),
                     Text(booking.driverPhone!, style: TextStyle(fontSize: 12, color: Colors.grey[600])),
                   ])),
-                  // ✅ Call button
                   GestureDetector(
                     onTap: () => _callDriver(booking.driverPhone!),
                     child: Container(width: 38, height: 38,
@@ -1293,7 +1296,6 @@ class _MyBookingsScreenState extends State<MyBookingsScreen>
                         child: const Icon(Icons.call_rounded, color: Color(0xFF2E7D32), size: 18)),
                   ),
                   const SizedBox(width: 8),
-                  // ✅ WhatsApp button
                   GestureDetector(
                     onTap: () => _whatsappDriver(booking.driverPhone!),
                     child: Container(width: 38, height: 38,

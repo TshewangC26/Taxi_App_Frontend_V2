@@ -188,12 +188,27 @@ class _PassengerHomeScreenState extends State<PassengerHomeScreen>
 
   List<TaxiRoute> _filterRoutes(List<TaxiRoute> routes) {
     if (_searchQuery.isEmpty) return routes;
-    final query = _searchQuery.toLowerCase().trim();
+
+    // ✅ Split by '-' to get pickup and dropoff parts
+    final parts = _searchQuery.split('-');
+    final fromQuery = parts[0].toLowerCase().trim();
+    final toQuery = parts.length > 1 ? parts[1].toLowerCase().trim() : '';
+
     return routes.where((route) {
       final pickup  = route.pickupLocation.toLowerCase();
       final dropoff = route.dropoffLocation.toLowerCase();
-      return pickup.startsWith(query) || dropoff.startsWith(query) ||
-          pickup.contains(query) || dropoff.contains(query);
+
+      // ✅ If only one part typed (e.g. "JNEC")
+      // show all routes where pickup OR dropoff contains it
+      if (toQuery.isEmpty) {
+        return pickup.contains(fromQuery) || dropoff.contains(fromQuery);
+      }
+
+      // ✅ If two parts typed (e.g. "JNEC - White Temple")
+      // match pickup contains first part AND dropoff contains second part
+      // OR reverse direction
+      return (pickup.contains(fromQuery) && dropoff.contains(toQuery)) ||
+             (pickup.contains(toQuery) && dropoff.contains(fromQuery));
     }).toList();
   }
 
@@ -354,7 +369,7 @@ class _PassengerHomeScreenState extends State<PassengerHomeScreen>
                   controller: _searchController,
                   style: const TextStyle(fontSize: 14, color: Colors.black87),
                   decoration: InputDecoration(
-                    hintText: 'Search by location...',
+                    hintText: 'e.g. JNEC or JNEC - Samdrupjongkhar',
                     hintStyle: TextStyle(color: Colors.grey[400], fontSize: 14),
                     prefixIcon: Icon(Icons.search_rounded, color: Colors.grey[400], size: 20),
                     suffixIcon: _searchQuery.isNotEmpty

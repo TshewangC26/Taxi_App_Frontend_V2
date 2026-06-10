@@ -126,18 +126,6 @@ class _ProfileScreenState extends State<ProfileScreen>
                 Navigator.push(context, MaterialPageRoute(builder: (_) => const AboutUsScreen()));
               },
             ),
-            Divider(height: 1, color: Colors.grey.shade100),
-            _menuItem(
-              icon: Icons.logout_rounded,
-              iconColor: Colors.red[400]!,
-              iconBg: Colors.red[50]!,
-              title: 'Logout',
-              subtitle: 'Sign out of your account',
-              onTap: () {
-                Navigator.pop(ctx);
-                _confirmLogout();
-              },
-            ),
           ],
         ),
       ),

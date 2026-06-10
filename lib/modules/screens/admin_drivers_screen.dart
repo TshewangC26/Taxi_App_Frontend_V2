@@ -45,6 +45,9 @@ class _AdminDriversScreenState extends State<AdminDriversScreen>
   List<dynamic> _filteredDrivers = [];
   bool _isLoading = true;
 
+  // ✅ Dynamic vehicle types
+  List<Map<String, String>> _vehicleTypes = [];
+
   final TextEditingController _searchController = TextEditingController();
   String _searchQuery = '';
 
@@ -61,6 +64,7 @@ class _AdminDriversScreenState extends State<AdminDriversScreen>
     _fadeAnim = CurvedAnimation(parent: _animController, curve: Curves.easeOut);
     _animController.forward();
     _loadDrivers();
+    _loadVehicleTypes();
 
     _searchController.addListener(() {
       setState(() {
@@ -77,6 +81,28 @@ class _AdminDriversScreenState extends State<AdminDriversScreen>
     _animController.dispose();
     _searchController.dispose();
     super.dispose();
+  }
+
+  // ✅ Load vehicle types from API
+  Future<void> _loadVehicleTypes() async {
+    try {
+      final response = await _apiService.get('/vehicle-types');
+      final List<dynamic> types = response['vehicle_types'] ?? [];
+      setState(() {
+        _vehicleTypes = types.map<Map<String, String>>((t) => {
+          'name': t['name'].toString(),
+          'display_name': t['display_name'].toString(),
+        }).toList();
+      });
+    } catch (_) {
+      setState(() {
+        _vehicleTypes = [
+          {'name': '4-seater', 'display_name': '4-Seater'},
+          {'name': '7-seater', 'display_name': '7-Seater'},
+          {'name': '8-seater', 'display_name': '8-Seater'},
+        ];
+      });
+    }
   }
 
   void _onNavTap(int index) {
@@ -268,9 +294,13 @@ class _AdminDriversScreenState extends State<AdminDriversScreen>
     );
   }
 
+  // ✅ Dynamic vehicle dropdown from API
   Widget _vehicleDropdown(String value, void Function(String) onChanged) {
+    final validValue = _vehicleTypes.any((t) => t['name'] == value)
+        ? value
+        : (_vehicleTypes.isNotEmpty ? _vehicleTypes.first['name']! : '4-seater');
     return DropdownButtonFormField<String>(
-      value: value,
+      value: validValue,
       style: const TextStyle(fontSize: 14, color: Colors.black87),
       decoration: InputDecoration(
         labelText: 'Vehicle Type',
@@ -282,11 +312,10 @@ class _AdminDriversScreenState extends State<AdminDriversScreen>
         enabledBorder: OutlineInputBorder(borderRadius: BorderRadius.circular(12), borderSide: BorderSide(color: Colors.grey.shade200)),
         focusedBorder: OutlineInputBorder(borderRadius: BorderRadius.circular(12), borderSide: BorderSide(color: Colors.yellow[800]!, width: 2)),
       ),
-      items: const [
-        DropdownMenuItem(value: '4-seater', child: Text('4-Seater')),
-        DropdownMenuItem(value: '7-seater', child: Text('7-Seater')),
-        DropdownMenuItem(value: '8-seater', child: Text('8-Seater')),
-      ],
+      items: _vehicleTypes.map((t) => DropdownMenuItem(
+        value: t['name'],
+        child: Text(t['display_name']!),
+      )).toList(),
       onChanged: (v) => onChanged(v!),
     );
   }
@@ -309,7 +338,8 @@ class _AdminDriversScreenState extends State<AdminDriversScreen>
     final phoneCtrl = TextEditingController();
     final vehicleNumCtrl = TextEditingController();
     final licenseCtrl = TextEditingController();
-    String vehicleType = '4-seater';
+    // ✅ Use first vehicle type from API as default
+    String vehicleType = _vehicleTypes.isNotEmpty ? _vehicleTypes.first['name']! : '4-seater';
 
     showDialog(
       context: context,
@@ -363,7 +393,6 @@ class _AdminDriversScreenState extends State<AdminDriversScreen>
                         return;
                       }
 
-                      // ✅ Phone validation
                       final phoneError = _validateBhutanPhone(phoneCtrl.text);
                       if (phoneError != null) {
                         await showDialog(context: context, barrierDismissible: true,
@@ -372,7 +401,6 @@ class _AdminDriversScreenState extends State<AdminDriversScreen>
                         return;
                       }
 
-                      // ✅ Password minimum 12 characters
                       if (passwordCtrl.text.length < 12) {
                         await showDialog(context: context, barrierDismissible: true,
                           barrierColor: Colors.black.withOpacity(0.5),
@@ -454,7 +482,10 @@ class _AdminDriversScreenState extends State<AdminDriversScreen>
     final phoneCtrl = TextEditingController(text: driver['phone'] ?? '');
     final vehicleNumCtrl = TextEditingController(text: driver['vehicle_number'] ?? '');
     final licenseCtrl = TextEditingController(text: driver['license_number'] ?? '');
-    String vehicleType = driver['vehicle_type'] ?? '4-seater';
+    // ✅ Use existing vehicle type, fallback to first from API
+    String vehicleType = _vehicleTypes.any((t) => t['name'] == driver['vehicle_type'])
+        ? driver['vehicle_type']
+        : (_vehicleTypes.isNotEmpty ? _vehicleTypes.first['name']! : '4-seater');
 
     showDialog(
       context: context,
@@ -495,7 +526,6 @@ class _AdminDriversScreenState extends State<AdminDriversScreen>
                   const SizedBox(width: 12),
                   Expanded(child: ElevatedButton(
                     onPressed: () async {
-                      // ✅ Phone validation
                       if (phoneCtrl.text.isNotEmpty) {
                         final phoneError = _validateBhutanPhone(phoneCtrl.text);
                         if (phoneError != null) {

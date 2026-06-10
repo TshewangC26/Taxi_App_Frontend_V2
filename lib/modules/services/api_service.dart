@@ -237,7 +237,15 @@ class ApiService {
     if (response.statusCode >= 200 && response.statusCode < 300) {
       return jsonDecode(response.body);
     } else {
-      throw Exception('API Error: ${response.body}');
+      String friendlyMessage = 'Something went wrong. Please try again.';
+      try {
+        final errorBody = jsonDecode(response.body);
+        final msg = errorBody['message']?.toString() ?? '';
+        if (msg.isNotEmpty && !msg.contains('{')) {
+          friendlyMessage = msg;
+        }
+      } catch (_) {}
+      throw Exception(friendlyMessage);
     }
   }
 }

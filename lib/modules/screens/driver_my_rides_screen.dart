@@ -945,7 +945,7 @@ class _DriverMyRidesScreenState extends State<DriverMyRidesScreen>
                 Text(_statusLabel(status), style: TextStyle(color: sc, fontWeight: FontWeight.w700, fontSize: 12)),
               ]),
             ),
-            Text('#${booking['id']}', style: TextStyle(color: Colors.grey[400], fontSize: 12, fontWeight: FontWeight.w500)),
+            const SizedBox(width: 34),
           ]),
 
           const SizedBox(height: 14),

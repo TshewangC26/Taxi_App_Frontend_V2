@@ -19,6 +19,8 @@ class Booking {
   final int? rating;
   // ✅ Driver phone for contact
   final String? driverPhone;
+  // ✅ Driver vehicle number for identification
+  final String? driverVehicleNumber;
 
   Booking({
     required this.id,
@@ -39,6 +41,7 @@ class Booking {
     this.passengerLongitude,
     this.rating,
     this.driverPhone,
+    this.driverVehicleNumber,
   });
 
   factory Booking.fromJson(Map<String, dynamic> json) {
@@ -69,29 +72,32 @@ class Booking {
           : null,
       // ✅ Parse driver phone from API response
       driverPhone: json['driver_phone']?.toString(),
+      // ✅ Parse driver vehicle number from API response
+      driverVehicleNumber: json['driver_vehicle_number']?.toString(),
     );
   }
 
   Map<String, dynamic> toJson() {
     return {
-      'id':                  id,
-      'passenger_id':        passengerId,
-      'driver_id':           driverId,
-      'driver_firebase_id':  driverFirebaseId,
-      'pickup_location':     pickupLocation,
-      'dropoff_location':    dropoffLocation,
-      'vehicle_type':        vehicleType,
-      'estimated_price':     estimatedPrice,
-      'final_price':         finalPrice,
-      'status':              status,
-      'booking_type':        bookingType,
-      'scheduled_date':      scheduledDate,
-      'scheduled_time':      scheduledTime,
-      'created_at':          createdAt,
-      'passenger_latitude':  passengerLatitude,
-      'passenger_longitude': passengerLongitude,
-      'rating':              rating,
-      'driver_phone':        driverPhone,
+      'id':                    id,
+      'passenger_id':          passengerId,
+      'driver_id':             driverId,
+      'driver_firebase_id':    driverFirebaseId,
+      'pickup_location':       pickupLocation,
+      'dropoff_location':      dropoffLocation,
+      'vehicle_type':          vehicleType,
+      'estimated_price':       estimatedPrice,
+      'final_price':           finalPrice,
+      'status':                status,
+      'booking_type':          bookingType,
+      'scheduled_date':        scheduledDate,
+      'scheduled_time':        scheduledTime,
+      'created_at':            createdAt,
+      'passenger_latitude':    passengerLatitude,
+      'passenger_longitude':   passengerLongitude,
+      'rating':                rating,
+      'driver_phone':          driverPhone,
+      'driver_vehicle_number': driverVehicleNumber,
     };
   }
 }
