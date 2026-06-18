@@ -67,7 +67,6 @@ class _DriverMyRidesScreenState extends State<DriverMyRidesScreen>
     await Future.wait([dp.getMyRides(), dp.getAvailableBookings()]);
   }
 
-  // ✅ Reusable error dialog
   Future<void> _showErrorDialog(String title, String message) async {
     await showDialog(
       context: context, barrierDismissible: true,
@@ -124,6 +123,18 @@ class _DriverMyRidesScreenState extends State<DriverMyRidesScreen>
       await launchUrl(uri, mode: LaunchMode.externalApplication);
     } else if (mounted) {
       await _showErrorDialog('WhatsApp Not Found', 'WhatsApp is not installed on this device.\nPlease install WhatsApp and try again.');
+    }
+  }
+
+  // ✅ Navigate to passenger location using Google Maps
+  Future<void> _navigateToPassenger(double lat, double lng) async {
+    final uri = Uri.parse(
+      'https://www.google.com/maps/dir/?api=1&destination=$lat,$lng&travelmode=driving',
+    );
+    if (await canLaunchUrl(uri)) {
+      await launchUrl(uri, mode: LaunchMode.externalApplication);
+    } else if (mounted) {
+      await _showErrorDialog('Navigation Failed', 'Could not open Google Maps.\nPlease make sure Google Maps is installed.');
     }
   }
 
@@ -925,6 +936,11 @@ class _DriverMyRidesScreenState extends State<DriverMyRidesScreen>
     final passengerName = passenger?['name'] ?? booking['passenger_name'] ?? 'Passenger';
     final passengerPhone = passenger?['phone'] ?? passenger?['mobile'] ?? booking['passenger_phone'] ?? '';
 
+    // ✅ Get passenger lat/lng for navigation (only exists for "book for other")
+    final passengerLat = double.tryParse(booking['passenger_latitude']?.toString() ?? '');
+    final passengerLng = double.tryParse(booking['passenger_longitude']?.toString() ?? '');
+    final hasPassengerLocation = passengerLat != null && passengerLng != null;
+
     return Container(
       margin: const EdgeInsets.only(bottom: 14),
       decoration: BoxDecoration(color: Colors.white, borderRadius: BorderRadius.circular(18), border: Border.all(color: Colors.grey.shade100)),
@@ -998,7 +1014,6 @@ class _DriverMyRidesScreenState extends State<DriverMyRidesScreen>
               ])),
               if (passengerPhone.isNotEmpty)
                 Row(mainAxisSize: MainAxisSize.min, children: [
-                  // ✅ Call button
                   GestureDetector(
                     onTap: () => _callPassenger(passengerPhone),
                     child: Container(width: 38, height: 38,
@@ -1006,7 +1021,6 @@ class _DriverMyRidesScreenState extends State<DriverMyRidesScreen>
                         child: const Icon(Icons.call_rounded, color: Color(0xFF2E7D32), size: 18)),
                   ),
                   const SizedBox(width: 8),
-                  // ✅ WhatsApp button
                   GestureDetector(
                     onTap: () => _whatsappPassenger(passengerPhone),
                     child: Container(width: 38, height: 38,
@@ -1016,6 +1030,27 @@ class _DriverMyRidesScreenState extends State<DriverMyRidesScreen>
                 ]),
             ]),
           ),
+
+          // ✅ Navigate to passenger location — only shows for "book for other"
+          if (hasPassengerLocation && status != 'completed') ...[
+            SizedBox(
+              width: double.infinity,
+              height: 44,
+              child: OutlinedButton.icon(
+                onPressed: () => _navigateToPassenger(passengerLat, passengerLng),
+                icon: Icon(Icons.navigation_rounded, color: Colors.blue[700], size: 18),
+                label: Text(
+                  'Navigate to Passenger Location',
+                  style: TextStyle(color: Colors.blue[700], fontWeight: FontWeight.w600, fontSize: 13),
+                ),
+                style: OutlinedButton.styleFrom(
+                  side: BorderSide(color: Colors.blue.shade200),
+                  shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
+                ),
+              ),
+            ),
+            const SizedBox(height: 12),
+          ],
 
           Row(children: [
             Container(width: 8, height: 8, decoration: const BoxDecoration(color: Color(0xFF4CAF50), shape: BoxShape.circle)),

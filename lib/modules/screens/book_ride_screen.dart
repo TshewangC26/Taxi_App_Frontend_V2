@@ -1,8 +1,10 @@
 import 'dart:async';
 import 'dart:io';
+import 'dart:convert';
 import 'package:flutter/material.dart';
 import 'package:geolocator/geolocator.dart';
 import 'package:google_maps_flutter/google_maps_flutter.dart';
+import 'package:http/http.dart' as http;
 import 'package:provider/provider.dart';
 import '../providers/route_provider.dart';
 import '../providers/booking_provider.dart';
@@ -57,9 +59,16 @@ class _BookRideScreenState extends State<BookRideScreen>
 
   final ApiService _apiService = ApiService();
 
-  // ✅ Dynamic vehicle types
   List<Map<String, String>> _vehicleTypes = [];
   bool _loadingVehicleTypes = false;
+
+  // ✅ Book for Self / Other
+  String _bookingFor = 'self';
+  double? _otherLat;
+  double? _otherLng;
+  String? _otherLocationName;
+
+  static const String _googleApiKey = 'AIzaSyARq6dwj2ZA34rccWeY1EpynZA64YR9vY0';
 
   @override
   void initState() {
@@ -80,10 +89,7 @@ class _BookRideScreenState extends State<BookRideScreen>
       curve: const Interval(0.0, 0.7, curve: Curves.easeOut),
     ));
     _animController.forward();
-
-    // ✅ Load vehicle types from API
     _loadVehicleTypes();
-
     WidgetsBinding.instance.addPostFrameCallback((_) {
       Provider.of<RouteProvider>(context, listen: false).getRoutes();
       Provider.of<RouteProvider>(context, listen: false).getLocations();
@@ -91,7 +97,6 @@ class _BookRideScreenState extends State<BookRideScreen>
     });
   }
 
-  // ✅ Fetch vehicle types from API
   Future<void> _loadVehicleTypes() async {
     setState(() => _loadingVehicleTypes = true);
     try {
@@ -105,7 +110,6 @@ class _BookRideScreenState extends State<BookRideScreen>
         _loadingVehicleTypes = false;
       });
     } catch (_) {
-      // ✅ Fallback to defaults if API fails
       setState(() {
         _vehicleTypes = [
           {'name': '4-seater', 'display_name': '4-Seater'},
@@ -302,7 +306,15 @@ class _BookRideScreenState extends State<BookRideScreen>
   void _updateMapMarkers() {
     if (!mounted) return;
     final markers = <MarkerId, Marker>{};
-    if (_passengerLat != null && _passengerLng != null) {
+
+    if (_bookingFor == 'other' && _otherLat != null && _otherLng != null) {
+      markers[const MarkerId('other_location')] = Marker(
+        markerId: const MarkerId('other_location'),
+        position: LatLng(_otherLat!, _otherLng!),
+        infoWindow: InfoWindow(title: _otherLocationName ?? 'Selected Location'),
+        icon: BitmapDescriptor.defaultMarkerWithHue(BitmapDescriptor.hueOrange),
+      );
+    } else if (_bookingFor == 'self' && _passengerLat != null && _passengerLng != null) {
       markers[const MarkerId('passenger')] = Marker(
         markerId: const MarkerId('passenger'),
         position: LatLng(_passengerLat!, _passengerLng!),
@@ -310,6 +322,7 @@ class _BookRideScreenState extends State<BookRideScreen>
         icon: BitmapDescriptor.defaultMarkerWithHue(BitmapDescriptor.hueBlue),
       );
     }
+
     for (final driver in _availableDrivers) {
       final lat = driver['latitude'];
       final lng = driver['longitude'];
@@ -328,6 +341,32 @@ class _BookRideScreenState extends State<BookRideScreen>
       }
     }
     setState(() { _mapMarkers.clear(); _mapMarkers.addAll(markers); });
+  }
+
+  Future<void> _onMapTap(LatLng position) async {
+    if (_bookingFor != 'other') return;
+    setState(() {
+      _otherLat = position.latitude;
+      _otherLng = position.longitude;
+      _otherLocationName = '${position.latitude.toStringAsFixed(5)}, ${position.longitude.toStringAsFixed(5)}';
+    });
+    _updateMapMarkers();
+    try {
+      final url = Uri.parse(
+        'https://maps.googleapis.com/maps/api/geocode/json'
+        '?latlng=${position.latitude},${position.longitude}'
+        '&key=$_googleApiKey',
+      );
+      final response = await http.get(url);
+      if (response.statusCode == 200) {
+        final data = json.decode(response.body);
+        final results = data['results'] as List;
+        if (results.isNotEmpty) {
+          setState(() => _otherLocationName = results[0]['formatted_address']);
+        }
+      }
+    } catch (_) {}
+    if (_vehicleType != null) _loadAllAvailableDrivers();
   }
 
   void _loadDriversBasedOnBookingType() {
@@ -393,7 +432,11 @@ class _BookRideScreenState extends State<BookRideScreen>
           });
         } catch (_) {}
       });
-      nearby.sort((a, b) => (a['distance_km'] as double).compareTo(b['distance_km'] as double));
+      nearby.sort((a, b) {
+        final ratingA = double.tryParse(a['average_rating']?.toString() ?? '0') ?? 0.0;
+        final ratingB = double.tryParse(b['average_rating']?.toString() ?? '0') ?? 0.0;
+        return ratingB.compareTo(ratingA);
+      });
       setState(() { _availableDrivers = nearby; _loadingDrivers = false; });
       _updateMapMarkers();
     });
@@ -422,6 +465,11 @@ class _BookRideScreenState extends State<BookRideScreen>
           'average_rating': driver['average_rating'] ?? 0, 'total_ratings': driver['total_ratings'] ?? 0,
         });
       }
+      filtered.sort((a, b) {
+        final ratingA = double.tryParse(a['average_rating']?.toString() ?? '0') ?? 0.0;
+        final ratingB = double.tryParse(b['average_rating']?.toString() ?? '0') ?? 0.0;
+        return ratingB.compareTo(ratingA);
+      });
       if (mounted) {
         setState(() { _availableDrivers = filtered; _loadingDrivers = false; });
         _updateMapMarkers();
@@ -433,6 +481,9 @@ class _BookRideScreenState extends State<BookRideScreen>
       }
     }
   }
+
+  double? get _effectiveLat => _bookingFor == 'other' ? _otherLat : _passengerLat;
+  double? get _effectiveLng => _bookingFor == 'other' ? _otherLng : _passengerLng;
 
   Future<void> _bookRide() async {
     if (_pickupLocation == null || _dropoffLocation == null) {
@@ -451,6 +502,10 @@ class _BookRideScreenState extends State<BookRideScreen>
       await _showErrorDialog('Missing Schedule', 'Please select both a date and time for your scheduled ride.');
       return;
     }
+    if (_bookingType == 'scheduled' && _bookingFor == 'other' && (_otherLat == null || _otherLng == null)) {
+      await _showErrorDialog('Missing Location', 'Please tap on the map to set the location for the person you are booking for.');
+      return;
+    }
     final bookingProvider = Provider.of<BookingProvider>(context, listen: false);
     String? scheduledDateStr;
     String? scheduledTimeStr;
@@ -462,7 +517,7 @@ class _BookRideScreenState extends State<BookRideScreen>
       pickupLocation: _pickupLocation!, dropoffLocation: _dropoffLocation!,
       vehicleType: _vehicleType!, bookingType: _bookingType, driverId: _selectedDriver!['id'],
       scheduledDate: scheduledDateStr, scheduledTime: scheduledTimeStr,
-      passengerLatitude: _passengerLat, passengerLongitude: _passengerLng,
+      passengerLatitude: _effectiveLat, passengerLongitude: _effectiveLng,
     );
     if (success && mounted) {
       _driversSubscription?.cancel();
@@ -475,7 +530,6 @@ class _BookRideScreenState extends State<BookRideScreen>
     } else if (mounted) {
       final rawError = bookingProvider.errorMessage ?? '';
       String friendlyMessage = 'Could not create booking.\nPlease try again.';
-
       if (rawError.contains('Route not found')) {
         friendlyMessage = 'No route found between the selected locations.\nPlease choose a different pickup or dropoff.';
       } else if (rawError.contains('already have an active') || rawError.contains('active booking')) {
@@ -491,7 +545,6 @@ class _BookRideScreenState extends State<BookRideScreen>
       } else if (rawError.isNotEmpty && !rawError.contains('Exception') && !rawError.contains('{')) {
         friendlyMessage = rawError;
       }
-
       await _showErrorDialog('Booking Failed', friendlyMessage);
     }
   }
@@ -502,7 +555,6 @@ class _BookRideScreenState extends State<BookRideScreen>
     );
   }
 
-  // ✅ Reusable error dialog
   Future<void> _showErrorDialog(String title, String message) async {
     await showDialog(
       context: context, barrierDismissible: true,
@@ -567,11 +619,131 @@ class _BookRideScreenState extends State<BookRideScreen>
     ]);
   }
 
+  // ✅ Yellow theme for both date and time pickers
+  ThemeData get _pickerTheme => ThemeData.light().copyWith(
+    colorScheme: ColorScheme.light(
+      primary: Colors.yellow[800]!,
+      onPrimary: Colors.white,
+      secondary: Colors.yellow[800]!,
+      onSecondary: Colors.white,
+      surface: Colors.white,
+    ),
+    timePickerTheme: TimePickerThemeData(
+      backgroundColor: Colors.white,
+      hourMinuteColor: Colors.yellow[50],
+      hourMinuteTextColor: Colors.yellow[800],
+      dialHandColor: Colors.yellow[800],
+      dialBackgroundColor: Colors.yellow[50],
+      entryModeIconColor: Colors.yellow[800],
+    ),
+  );
+
+  Widget _buildBookingForToggle() {
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.start,
+      children: [
+        const SizedBox(height: 24),
+        const _SectionLabel(title: 'Booking For'),
+        const SizedBox(height: 12),
+        Row(children: [
+          Expanded(child: _BookingTypeCard(
+            icon: Icons.person_rounded,
+            label: 'Myself',
+            selected: _bookingFor == 'self',
+            onTap: () {
+              setState(() {
+                _bookingFor = 'self';
+                _otherLat = null;
+                _otherLng = null;
+                _otherLocationName = null;
+                _availableDrivers = [];
+                _selectedDriver = null;
+              });
+              _updateMapMarkers();
+              if (_passengerLat != null && _passengerLng != null) {
+                _mapController?.animateCamera(CameraUpdate.newLatLngZoom(LatLng(_passengerLat!, _passengerLng!), 15));
+              }
+              if (_vehicleType != null) _loadAllAvailableDrivers();
+            },
+          )),
+          const SizedBox(width: 12),
+          Expanded(child: _BookingTypeCard(
+            icon: Icons.group_rounded,
+            label: 'Someone Else',
+            selected: _bookingFor == 'other',
+            onTap: () {
+              setState(() {
+                _bookingFor = 'other';
+                _availableDrivers = [];
+                _selectedDriver = null;
+              });
+              _updateMapMarkers();
+              _mapController?.animateCamera(
+                CameraUpdate.newLatLngZoom(
+                  const LatLng(26.8655, 91.4644),
+                  14,
+                ),
+              );
+            },
+          )),
+        ]),
+
+        if (_bookingFor == 'other') ...[
+          const SizedBox(height: 12),
+          Container(
+            padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 12),
+            decoration: BoxDecoration(
+              color: Colors.yellow[50],
+              borderRadius: BorderRadius.circular(12),
+              border: Border.all(color: Colors.yellow[200]!),
+            ),
+            child: Row(children: [
+              Icon(Icons.touch_app_rounded, color: Colors.yellow[800], size: 18),
+              const SizedBox(width: 10),
+              Expanded(child: Text(
+                _otherLocationName != null
+                    ? '📍 $_otherLocationName'
+                    : 'Tap on the map above to set their location',
+                style: TextStyle(
+                  fontSize: 12,
+                  color: _otherLocationName != null ? Colors.yellow[900] : Colors.yellow[800],
+                  fontWeight: FontWeight.w600,
+                ),
+                maxLines: 2,
+                overflow: TextOverflow.ellipsis,
+              )),
+              if (_otherLocationName != null)
+                GestureDetector(
+                  onTap: () {
+                    setState(() {
+                      _otherLat = null;
+                      _otherLng = null;
+                      _otherLocationName = null;
+                      _availableDrivers = [];
+                      _selectedDriver = null;
+                    });
+                    _updateMapMarkers();
+                  },
+                  child: Icon(Icons.close_rounded, color: Colors.yellow[800], size: 18),
+                ),
+            ]),
+          ),
+        ],
+      ],
+    );
+  }
+
   @override
   Widget build(BuildContext context) {
     final routeProvider   = Provider.of<RouteProvider>(context);
     final bookingProvider = Provider.of<BookingProvider>(context);
     final locations       = routeProvider.getAllLocations();
+
+    final LatLng mapCenter = _bookingFor == 'other'
+        ? const LatLng(26.8655, 91.4644)
+        : (_passengerLat != null
+            ? LatLng(_passengerLat!, _passengerLng!)
+            : const LatLng(26.8018, 91.5567));
 
     return Scaffold(
       backgroundColor: const Color(0xFFF4F4F6),
@@ -634,42 +806,65 @@ class _BookRideScreenState extends State<BookRideScreen>
                 position: _slideAnim,
                 child: Column(
                   children: [
-                    // ✅ Map outside scroll view
                     Padding(
                       padding: const EdgeInsets.fromLTRB(16, 16, 16, 0),
                       child: ClipRRect(
                         borderRadius: BorderRadius.circular(18),
-                        child: SizedBox(
-                          height: 200,
-                          child: _passengerLat != null
-                              ? GoogleMap(
-                                  initialCameraPosition: CameraPosition(
-                                      target: LatLng(_passengerLat!, _passengerLng!), zoom: 15),
-                                  onMapCreated: (c) => _mapController = c,
-                                  mapType: MapType.hybrid,
-                                  markers: Set<Marker>.of(_mapMarkers.values),
-                                  myLocationEnabled: true,
-                                  myLocationButtonEnabled: false,
-                                  zoomControlsEnabled: false,
-                                  mapToolbarEnabled: false,
-                                  zoomGesturesEnabled: true,
-                                  scrollGesturesEnabled: true,
-                                  rotateGesturesEnabled: true,
-                                  tiltGesturesEnabled: true,
-                                )
-                              : Container(
-                                  color: Colors.grey.shade200,
-                                  child: Column(mainAxisAlignment: MainAxisAlignment.center, children: [
-                                    CircularProgressIndicator(valueColor: AlwaysStoppedAnimation<Color>(Colors.yellow[800]!)),
-                                    const SizedBox(height: 10),
-                                    Text('Getting your location...', style: TextStyle(color: Colors.grey[500], fontSize: 13)),
-                                  ]),
+                        child: Stack(
+                          children: [
+                            SizedBox(
+                              height: 200,
+                              child: _passengerLat != null || _bookingFor == 'other'
+                                  ? GoogleMap(
+                                      key: ValueKey(_bookingFor),
+                                      initialCameraPosition: CameraPosition(
+                                        target: mapCenter,
+                                        zoom: _bookingFor == 'other' ? 14 : 15,
+                                      ),
+                                      onMapCreated: (c) => _mapController = c,
+                                      mapType: MapType.hybrid,
+                                      markers: Set<Marker>.of(_mapMarkers.values),
+                                      myLocationEnabled: _bookingFor == 'self',
+                                      myLocationButtonEnabled: false,
+                                      zoomControlsEnabled: false,
+                                      mapToolbarEnabled: false,
+                                      zoomGesturesEnabled: true,
+                                      scrollGesturesEnabled: true,
+                                      rotateGesturesEnabled: true,
+                                      tiltGesturesEnabled: true,
+                                      onTap: _bookingFor == 'other' ? _onMapTap : null,
+                                    )
+                                  : Container(
+                                      color: Colors.grey.shade200,
+                                      child: Column(mainAxisAlignment: MainAxisAlignment.center, children: [
+                                        CircularProgressIndicator(valueColor: AlwaysStoppedAnimation<Color>(Colors.yellow[800]!)),
+                                        const SizedBox(height: 10),
+                                        Text('Getting your location...', style: TextStyle(color: Colors.grey[500], fontSize: 13)),
+                                      ]),
+                                    ),
+                            ),
+                            if (_bookingFor == 'other')
+                              Positioned(
+                                top: 10, left: 0, right: 0,
+                                child: Center(
+                                  child: Container(
+                                    padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 6),
+                                    decoration: BoxDecoration(
+                                      color: Colors.black.withOpacity(0.55),
+                                      borderRadius: BorderRadius.circular(20),
+                                    ),
+                                    child: const Text(
+                                      '📍 Tap map to set location',
+                                      style: TextStyle(color: Colors.white, fontSize: 12, fontWeight: FontWeight.w600),
+                                    ),
+                                  ),
                                 ),
+                              ),
+                          ],
                         ),
                       ),
                     ),
 
-                    // ✅ Everything else scrolls below the map
                     Expanded(
                       child: SingleChildScrollView(
                         padding: const EdgeInsets.fromLTRB(16, 16, 16, 32),
@@ -722,7 +917,6 @@ class _BookRideScreenState extends State<BookRideScreen>
                               ),
                               const SizedBox(height: 12),
 
-                              // ✅ Dynamic vehicle type dropdown from API
                               _loadingVehicleTypes
                                   ? Container(
                                       height: 56,
@@ -744,7 +938,7 @@ class _BookRideScreenState extends State<BookRideScreen>
                                       )).toList(),
                                       onChanged: (v) {
                                         setState(() { _vehicleType = v; _selectedDriver = null; _availableDrivers = []; });
-                                        if (_passengerLat != null && _passengerLng != null) {
+                                        if (_effectiveLat != null && _effectiveLng != null) {
                                           _loadDriversBasedOnBookingType();
                                         } else {
                                           Future.delayed(const Duration(seconds: 3), () {
@@ -762,7 +956,19 @@ class _BookRideScreenState extends State<BookRideScreen>
                                 Expanded(child: _BookingTypeCard(
                                   icon: Icons.flash_on_rounded, label: 'Book Now', selected: _bookingType == 'now',
                                   onTap: () {
-                                    setState(() { _bookingType = 'now'; _availableDrivers = []; _selectedDriver = null; });
+                                    setState(() {
+                                      _bookingType = 'now';
+                                      _availableDrivers = [];
+                                      _selectedDriver = null;
+                                      _bookingFor = 'self';
+                                      _otherLat = null;
+                                      _otherLng = null;
+                                      _otherLocationName = null;
+                                    });
+                                    _updateMapMarkers();
+                                    if (_passengerLat != null) {
+                                      _mapController?.animateCamera(CameraUpdate.newLatLngZoom(LatLng(_passengerLat!, _passengerLng!), 15));
+                                    }
                                     if (_vehicleType != null) _loadDriversBasedOnBookingType();
                                   },
                                 )),
@@ -789,8 +995,9 @@ class _BookRideScreenState extends State<BookRideScreen>
                                         initialDate: DateTime.now().add(const Duration(days: 1)),
                                         firstDate: DateTime.now(),
                                         lastDate: DateTime.now().add(const Duration(days: 30)),
+                                        // ✅ Yellow theme for date picker
                                         builder: (ctx, child) => Theme(
-                                          data: ThemeData.light().copyWith(colorScheme: ColorScheme.light(primary: Colors.yellow[800]!)),
+                                          data: _pickerTheme,
                                           child: child!,
                                         ),
                                       );
@@ -804,8 +1011,9 @@ class _BookRideScreenState extends State<BookRideScreen>
                                     onTap: () async {
                                       final time = await showTimePicker(
                                         context: context, initialTime: TimeOfDay.now(),
+                                        // ✅ Yellow theme for time picker
                                         builder: (ctx, child) => Theme(
-                                          data: ThemeData.light().copyWith(colorScheme: ColorScheme.light(primary: Colors.yellow[800]!)),
+                                          data: _pickerTheme,
                                           child: child!,
                                         ),
                                       );
@@ -831,6 +1039,7 @@ class _BookRideScreenState extends State<BookRideScreen>
                                     },
                                   )),
                                 ]),
+                                _buildBookingForToggle(),
                               ],
 
                               const SizedBox(height: 24),
@@ -850,7 +1059,6 @@ class _BookRideScreenState extends State<BookRideScreen>
                                     ]),
                                 ]),
                                 const SizedBox(height: 12),
-
                                 _loadingDrivers
                                     ? Center(child: Padding(
                                         padding: const EdgeInsets.all(24),
